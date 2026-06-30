@@ -9,7 +9,7 @@
     "fallbackMessage": "등록된 안내에서 정확한 답변을 찾지 못했어요. 아래 질문을 확인해 주세요.",
     "disclaimer": "응급 증상은 즉시 병원으로 전화하거나 가까운 응급 병원을 방문해 주세요."
   },
-  "theme": { "primaryColor": "#0E9F6E", "position": "bottom-right", "homeTitle": "Care Desk" },
+  "theme": { "primaryColor": "#3182F6", "position": "bottom-right", "homeTitle": "Care Desk" },
   "operation": { "botHours": "24시간 자동 안내", "csHours": "평일 10:00 ~ 19:00, 토요일 10:00 ~ 15:00" },
   "notices": [
     {

@@ -4,17 +4,14 @@
 
 html {
   min-width: 320px;
-  background: #eef1f5;
+  background: var(--color-background);
 }
 
 body {
   margin: 0;
   font-family: var(--font-family);
   color: var(--color-text-primary);
-  background:
-    linear-gradient(135deg, rgba(255, 138, 0, 0.08), transparent 36%),
-    linear-gradient(215deg, rgba(47, 140, 255, 0.1), transparent 42%),
-    var(--color-background);
+  background: var(--color-background);
 }
 
 button,
@@ -30,7 +27,7 @@ button {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--chatplate-primary, var(--color-primary)) 45%, transparent);
+  outline: 3px solid rgba(49, 130, 246, 0.28);
   outline-offset: 2px;
 }
 
@@ -42,31 +39,32 @@ select:focus-visible {
   min-height: 100dvh;
   display: grid;
   align-items: center;
-  padding: 48px;
+  padding: 40px;
 }
 
 .demo-stage > div {
-  max-width: 640px;
+  max-width: 520px;
 }
 
 .demo-kicker {
   margin: 0 0 10px;
-  color: #516070;
+  color: var(--color-text-tertiary);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
+  font-size: 12px;
 }
 
 .demo-stage h1 {
   margin: 0;
-  font-size: clamp(48px, 8vw, 104px);
-  line-height: 0.95;
+  font-size: 44px;
+  line-height: 1.08;
   letter-spacing: 0;
 }
 
 .demo-stage p {
   max-width: 520px;
-  color: #4b5563;
-  font-size: 18px;
-  line-height: 1.7;
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  line-height: 1.65;
 }

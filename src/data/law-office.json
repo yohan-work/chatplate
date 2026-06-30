@@ -9,7 +9,7 @@
     "fallbackMessage": "정확한 안내를 찾지 못했습니다. 자주 묻는 질문을 먼저 확인해 주세요.",
     "disclaimer": "이 안내는 일반 정보이며 구체적 법률 의견은 변호사 상담을 통해 확인해야 합니다."
   },
-  "theme": { "primaryColor": "#243B53", "position": "bottom-right", "homeTitle": "Legal Desk" },
+  "theme": { "primaryColor": "#3182F6", "position": "bottom-right", "homeTitle": "Legal Desk" },
   "operation": { "botHours": "24시간 상담 접수", "csHours": "평일 09:30 ~ 18:30" },
   "notices": [
     {
