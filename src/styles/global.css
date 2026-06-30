@@ -1,0 +1,72 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: #eef1f5;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  color: var(--color-text-primary);
+  background:
+    linear-gradient(135deg, rgba(255, 138, 0, 0.08), transparent 36%),
+    linear-gradient(215deg, rgba(47, 140, 255, 0.1), transparent 42%),
+    var(--color-background);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--chatplate-primary, var(--color-primary)) 45%, transparent);
+  outline-offset: 2px;
+}
+
+.demo-page {
+  min-height: 100dvh;
+}
+
+.demo-stage {
+  min-height: 100dvh;
+  display: grid;
+  align-items: center;
+  padding: 48px;
+}
+
+.demo-stage > div {
+  max-width: 640px;
+}
+
+.demo-kicker {
+  margin: 0 0 10px;
+  color: #516070;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.demo-stage h1 {
+  margin: 0;
+  font-size: clamp(48px, 8vw, 104px);
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.demo-stage p {
+  max-width: 520px;
+  color: #4b5563;
+  font-size: 18px;
+  line-height: 1.7;
+}
