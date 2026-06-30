@@ -1,5 +1,7 @@
 export type WidgetView = 'home' | 'chat' | 'conversations' | 'settings' | 'notice';
 
+export type AdminPanelView = 'bot' | 'operation' | 'notices' | 'knowledge' | 'quickReplies' | 'logs';
+
 export type ButtonType = 'url' | 'action' | 'tel' | 'mailto';
 
 export interface AnswerButton {
@@ -81,6 +83,8 @@ export interface BotConfig {
   quickReplies: QuickReply[];
   knowledge: KnowledgeItem[];
 }
+
+export type BotConfigMap = Record<string, BotConfig>;
 
 export interface ChatMessage {
   id: string;
