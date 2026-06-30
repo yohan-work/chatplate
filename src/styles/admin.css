@@ -322,6 +322,165 @@
   align-items: stretch;
 }
 
+.ticket-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ticket-summary button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ticket-summary button.is-active {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.ticket-summary strong {
+  color: inherit;
+  font-size: 13px;
+}
+
+.ticket-layout {
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+}
+
+.ticket-list-item {
+  gap: 7px;
+}
+
+.ticket-list-item .ticket-status {
+  width: fit-content;
+}
+
+.ticket-status {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.ticket-status--new {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.ticket-status--inProgress {
+  color: #8a5a00;
+  background: #fff7dc;
+}
+
+.ticket-status--resolved {
+  color: var(--color-success);
+  background: #e8fff3;
+}
+
+.ticket-status--onHold {
+  color: var(--color-text-secondary);
+  background: var(--color-surface-soft);
+}
+
+.ticket-detail {
+  background: var(--color-surface);
+}
+
+.ticket-detail__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.ticket-detail__top div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.ticket-detail__top span {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ticket-detail__top strong {
+  overflow-wrap: anywhere;
+  color: var(--color-text-primary);
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.ticket-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ticket-meta-grid div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-soft);
+}
+
+.ticket-meta-grid span {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ticket-meta-grid strong {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-related {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface-soft);
+}
+
+.ticket-related strong {
+  flex-basis: 100%;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.ticket-related span {
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .data-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
