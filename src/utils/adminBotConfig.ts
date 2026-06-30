@@ -22,10 +22,14 @@ export function createEmptyKnowledge(categoryId: string): KnowledgeItem {
     question: '새 질문',
     keywords: [],
     aliases: [],
+    tags: [],
+    negativeKeywords: [],
     answer: '답변을 입력하세요.',
     buttons: [],
     relatedIds: [],
     priority: 5,
+    status: 'draft',
+    lastUpdated: new Date().toISOString(),
   };
 }
 

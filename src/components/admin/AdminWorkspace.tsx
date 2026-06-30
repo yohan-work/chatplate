@@ -9,8 +9,10 @@ import {
   RotateCcw,
   Search,
   Settings,
+  Sparkles,
   Trash2,
 } from 'lucide-react';
+import { searchKnowledge } from '../../engine/searchKnowledge';
 import type { AdminPanelView, BotConfig, BotConfigMap, KnowledgeItem, Notice, QuickReply } from '../../types/chatbot';
 import {
   createEmptyKnowledge,
@@ -20,6 +22,7 @@ import {
   parseCommaList,
   removeKnowledgeItem,
 } from '../../utils/adminBotConfig';
+import { clearConversationEvents, loadConversationEvents } from '../../utils/conversationEvents';
 import { ChatbotLauncher } from '../widget/ChatbotLauncher';
 import { ChatbotWidget } from '../widget/ChatbotWidget';
 
@@ -39,6 +42,7 @@ const panelItems: Array<{ id: AdminPanelView; label: string; icon: typeof Bot }>
   { id: 'notices', label: '공지', icon: Bell },
   { id: 'knowledge', label: 'FAQ', icon: Search },
   { id: 'quickReplies', label: '추천 질문', icon: ListChecks },
+  { id: 'quality', label: '검색 품질', icon: Sparkles },
   { id: 'logs', label: '실패 질문', icon: MessageSquareWarning },
 ];
 
@@ -328,7 +332,33 @@ function KnowledgeEditor({
             </label>
             <TextField label="키워드" value={formatCommaList(selectedKnowledge.keywords)} onChange={(value) => updateKnowledge(selectedKnowledge.id, { keywords: parseCommaList(value) })} />
             <TextField label="별칭 질문" value={formatCommaList(selectedKnowledge.aliases)} onChange={(value) => updateKnowledge(selectedKnowledge.id, { aliases: parseCommaList(value) })} />
+            <TextField label="태그" value={formatCommaList(selectedKnowledge.tags ?? [])} onChange={(value) => updateKnowledge(selectedKnowledge.id, { tags: parseCommaList(value) })} />
+            <TextField
+              label="제외 키워드"
+              value={formatCommaList(selectedKnowledge.negativeKeywords ?? [])}
+              onChange={(value) => updateKnowledge(selectedKnowledge.id, { negativeKeywords: parseCommaList(value) })}
+            />
             <TextAreaField label="답변" value={selectedKnowledge.answer} rows={7} onChange={(value) => updateKnowledge(selectedKnowledge.id, { answer: value })} />
+            <label className="admin-field">
+              <span>상태</span>
+              <select
+                value={selectedKnowledge.status ?? 'active'}
+                onChange={(event) => updateKnowledge(selectedKnowledge.id, { status: event.target.value as KnowledgeItem['status'] })}
+              >
+                <option value="active">active</option>
+                <option value="draft">draft</option>
+                <option value="archived">archived</option>
+              </select>
+            </label>
+            <TextField label="출처" value={selectedKnowledge.source ?? ''} onChange={(value) => updateKnowledge(selectedKnowledge.id, { source: value })} />
+            <label className="admin-check">
+              <input
+                type="checkbox"
+                checked={Boolean(selectedKnowledge.handoffRecommended)}
+                onChange={(event) => updateKnowledge(selectedKnowledge.id, { handoffRecommended: event.target.checked })}
+              />
+              <span>상담원 연결 권장</span>
+            </label>
             <label className="admin-field">
               <span>우선순위</span>
               <input
@@ -428,6 +458,131 @@ function UnknownQuestionsPanel({ questions }: { questions: string[] }) {
   );
 }
 
+function SearchQualityPanel({
+  config,
+  unknownQuestions,
+  onUpdate,
+}: {
+  config: BotConfig;
+  unknownQuestions: string[];
+  onUpdate: (updater: (config: BotConfig) => BotConfig) => void;
+}) {
+  const [query, setQuery] = useState(unknownQuestions[0] ?? '');
+  const result = useMemo(() => (query.trim() ? searchKnowledge(query, config) : null), [config, query]);
+  const matchedItem = result?.item;
+  const events = loadConversationEvents().filter((event) => event.botId === config.bot.id);
+  const lowConfidenceCount = events.filter((event) => event.confidence === 'low').length;
+  const negativeFeedbackCount = events.filter((event) => event.feedback === 'not-helpful').length;
+
+  const addToKnowledgeField = (field: 'aliases' | 'keywords') => {
+    if (!matchedItem || !query.trim()) return;
+    onUpdate((current) => ({
+      ...current,
+      knowledge: current.knowledge.map((item) => {
+        if (item.id !== matchedItem.id) return item;
+        const values = new Set([...(item[field] ?? []), query.trim()]);
+        return { ...item, [field]: [...values], lastUpdated: new Date().toISOString() };
+      }),
+    }));
+  };
+
+  const createFaqFromQuery = () => {
+    if (!query.trim()) return;
+    const item = {
+      ...createEmptyKnowledge(config.categories[0]?.id ?? 'general'),
+      question: query.trim(),
+      keywords: [],
+      aliases: [],
+      answer: '답변을 입력하세요.',
+      status: 'draft' as const,
+      lastUpdated: new Date().toISOString(),
+    };
+    onUpdate((current) => ({ ...current, knowledge: [item, ...current.knowledge] }));
+  };
+
+  return (
+    <section className="admin-panel">
+      <PanelHeader title="검색 품질" description="질문을 입력해 매칭 결과와 신뢰도, 점수 breakdown을 확인하고 FAQ를 개선합니다." />
+
+      <div className="quality-summary">
+        <div>
+          <strong>{events.length}</strong>
+          <span>검색 이벤트</span>
+        </div>
+        <div>
+          <strong>{lowConfidenceCount}</strong>
+          <span>낮은 신뢰도</span>
+        </div>
+        <div>
+          <strong>{negativeFeedbackCount}</strong>
+          <span>부정 피드백</span>
+        </div>
+        <button className="admin-reset-button" type="button" onClick={() => clearConversationEvents()}>
+          로그 초기화
+        </button>
+      </div>
+
+      <TextField label="테스트 질문" value={query} onChange={setQuery} placeholder="예: 설치랑 요금 알려줘" />
+
+      {result ? (
+        <div className="quality-result">
+          <div className="quality-result__top">
+            <div>
+              <span className={`confidence-badge confidence-badge--${result.confidence}`}>{result.confidence}</span>
+              <strong>{matchedItem?.question ?? '매칭된 FAQ 없음'}</strong>
+              <p>score {result.score} · {result.matchedFields.join(', ') || 'matched field 없음'}</p>
+            </div>
+            <div className="quality-actions">
+              <button type="button" onClick={() => addToKnowledgeField('aliases')} disabled={!matchedItem}>
+                alias로 추가
+              </button>
+              <button type="button" onClick={() => addToKnowledgeField('keywords')} disabled={!matchedItem}>
+                keyword로 추가
+              </button>
+              <button type="button" onClick={createFaqFromQuery}>
+                새 FAQ 생성
+              </button>
+            </div>
+          </div>
+
+          {result.debugScore ? (
+            <div className="score-grid">
+              {Object.entries(result.debugScore).map(([key, value]) => (
+                <div key={key}>
+                  <span>{key}</span>
+                  <strong>{value}</strong>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {result.alternatives.length ? (
+            <div className="quality-alternatives">
+              <strong>후보 질문</strong>
+              {result.alternatives.map((item) => (
+                <span key={item.id}>{item.question}</span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <EmptyState text="테스트할 질문을 입력하세요." />
+      )}
+
+      {unknownQuestions.length ? (
+        <div className="quality-alternatives">
+          <strong>최근 실패 질문</strong>
+          {unknownQuestions.slice(-5).map((question, index) => (
+            <button key={`${question}-${index}`} type="button" onClick={() => setQuery(question)}>
+              {question}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function PanelHeader({
   title,
   description,
@@ -470,6 +625,7 @@ function renderActivePanel(
   if (activeView === 'notices') return <NoticeEditor config={config} onUpdate={onUpdate} />;
   if (activeView === 'knowledge') return <KnowledgeEditor config={config} onUpdate={onUpdate} />;
   if (activeView === 'quickReplies') return <QuickReplyEditor config={config} onUpdate={onUpdate} />;
+  if (activeView === 'quality') return <SearchQualityPanel config={config} unknownQuestions={unknownQuestions} onUpdate={onUpdate} />;
   return <UnknownQuestionsPanel questions={unknownQuestions} />;
 }
 
