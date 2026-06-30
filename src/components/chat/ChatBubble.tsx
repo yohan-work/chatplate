@@ -6,9 +6,10 @@ interface ChatBubbleProps {
   onQuestionSelect: (item: KnowledgeItem) => void;
   onAction: (value: string) => void;
   onFeedback: (messageId: string, feedback: 'helpful' | 'not-helpful') => void;
+  onRequestHandoff: (message: ChatMessage) => void;
 }
 
-export function ChatBubble({ message, onQuestionSelect, onAction, onFeedback }: ChatBubbleProps) {
+export function ChatBubble({ message, onQuestionSelect, onAction, onFeedback, onRequestHandoff }: ChatBubbleProps) {
   const canGiveFeedback = message.role === 'bot' && Boolean(message.confidence);
 
   return (
@@ -58,6 +59,11 @@ export function ChatBubble({ message, onQuestionSelect, onAction, onFeedback }: 
             아니요
           </button>
         </div>
+      ) : null}
+      {message.handoffCta ? (
+        <button className="handoff-button" type="button" onClick={() => onRequestHandoff(message)}>
+          상담 요청 남기기
+        </button>
       ) : null}
       <time>{message.createdAt}</time>
     </article>

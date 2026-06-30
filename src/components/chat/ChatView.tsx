@@ -1,20 +1,43 @@
 import { Clock } from 'lucide-react';
-import type { BotConfig, ChatMessage, KnowledgeItem } from '../../types/chatbot';
+import type { BotConfig, ChatMessage, KnowledgeItem, Ticket, TicketSource } from '../../types/chatbot';
 import { findKnowledgeById } from '../../engine/searchKnowledge';
 import { Avatar } from '../common/Avatar';
 import { ChatBubble } from './ChatBubble';
 import { ChatInput } from './ChatInput';
+import { ContactRequestForm } from './ContactRequestForm';
+
+export interface ContactRequestContext {
+  source: TicketSource;
+  originalQuestion?: string;
+  matchedKnowledgeIds?: string[];
+  conversationEventId?: string;
+}
 
 interface ChatViewProps {
   botConfig: BotConfig;
   messages: ChatMessage[];
+  contactRequest: ContactRequestContext | null;
   onSubmit: (query: string) => void;
   onQuestionSelect: (item: KnowledgeItem) => void;
   onAction: (value: string) => void;
   onFeedback: (messageId: string, feedback: 'helpful' | 'not-helpful') => void;
+  onRequestHandoff: (message: ChatMessage) => void;
+  onCancelContactRequest: () => void;
+  onTicketCreated: (ticket: Ticket) => void;
 }
 
-export function ChatView({ botConfig, messages, onSubmit, onQuestionSelect, onAction, onFeedback }: ChatViewProps) {
+export function ChatView({
+  botConfig,
+  messages,
+  contactRequest,
+  onSubmit,
+  onQuestionSelect,
+  onAction,
+  onFeedback,
+  onRequestHandoff,
+  onCancelContactRequest,
+  onTicketCreated,
+}: ChatViewProps) {
   return (
     <div className="chat-view">
       <div className="chat-header">
@@ -40,8 +63,26 @@ export function ChatView({ botConfig, messages, onSubmit, onQuestionSelect, onAc
 
       <div className="message-list" aria-live="polite">
         {messages.map((message) => (
-          <ChatBubble key={message.id} message={message} onQuestionSelect={onQuestionSelect} onAction={onAction} onFeedback={onFeedback} />
+          <ChatBubble
+            key={message.id}
+            message={message}
+            onQuestionSelect={onQuestionSelect}
+            onAction={onAction}
+            onFeedback={onFeedback}
+            onRequestHandoff={onRequestHandoff}
+          />
         ))}
+        {contactRequest ? (
+          <ContactRequestForm
+            botConfig={botConfig}
+            source={contactRequest.source}
+            originalQuestion={contactRequest.originalQuestion}
+            matchedKnowledgeIds={contactRequest.matchedKnowledgeIds}
+            conversationEventId={contactRequest.conversationEventId}
+            onCancel={onCancelContactRequest}
+            onCreated={onTicketCreated}
+          />
+        ) : null}
       </div>
 
       <p className="disclaimer">{botConfig.bot.disclaimer}</p>

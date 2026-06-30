@@ -4,10 +4,11 @@ import { Bot, RotateCcw, X } from 'lucide-react';
 import { getFallbackSuggestions } from '../../engine/getFallbackSuggestions';
 import { findKnowledgeById, searchKnowledge } from '../../engine/searchKnowledge';
 import { appendConversationEvent, createConversationEvent, updateConversationEventFeedback } from '../../utils/conversationEvents';
-import type { BotConfig, ChatMessage, KnowledgeItem, Notice, SearchResult, WidgetView } from '../../types/chatbot';
+import type { BotConfig, ChatMessage, KnowledgeItem, Notice, SearchResult, Ticket, TicketSource, WidgetView } from '../../types/chatbot';
 import { BottomNavigation } from './BottomNavigation';
 import { HomeView } from '../home/HomeView';
 import { ChatView } from '../chat/ChatView';
+import type { ContactRequestContext } from '../chat/ChatView';
 import { ConversationsView } from '../conversations/ConversationsView';
 import { SettingsView } from '../settings/SettingsView';
 import { NoticeDetailView } from '../notice/NoticeDetailView';
@@ -18,6 +19,7 @@ interface ChatbotWidgetProps {
   onClose: () => void;
   onUnknownQuestion?: (question: string) => void;
   onSearchResult?: (query: string, result: SearchResult) => void;
+  onTicketCreated?: (ticket: Ticket) => void;
 }
 
 function createMessage(role: ChatMessage['role'], text: string, extra?: Partial<ChatMessage>): ChatMessage {
@@ -41,10 +43,12 @@ export function ChatbotWidget({
   onClose,
   onUnknownQuestion,
   onSearchResult,
+  onTicketCreated,
 }: ChatbotWidgetProps) {
   const [activeView, setActiveView] = useState<WidgetView>('home');
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
   const [unknownQuestions, setUnknownQuestions] = useState<string[]>([]);
+  const [contactRequest, setContactRequest] = useState<ContactRequestContext | null>(null);
   const initialMessages = useMemo(
     () => [createMessage('bot', botConfig.bot.greeting)],
     [botConfig.bot.greeting],
@@ -56,6 +60,7 @@ export function ChatbotWidget({
     setActiveView('home');
     setSelectedNotice(null);
     setUnknownQuestions([]);
+    setContactRequest(null);
   }, [initialMessages]);
 
   useEffect(() => {
@@ -79,8 +84,27 @@ export function ChatbotWidget({
     setMessages((current) => [
       ...current,
       createMessage('user', item.question),
-      createMessage('bot', item.answer, { buttons: item.buttons }),
+      createMessage('bot', item.answer, {
+        buttons: item.buttons,
+        matchedKnowledgeIds: [item.id],
+        handoffCta: Boolean(item.handoffRecommended),
+      }),
     ]);
+  };
+
+  const openContactRequest = (
+    source: TicketSource,
+    originalQuestion?: string,
+    matchedKnowledgeIds?: string[],
+    conversationEventId?: string,
+  ) => {
+    setContactRequest({
+      source,
+      originalQuestion,
+      matchedKnowledgeIds,
+      conversationEventId,
+    });
+    setActiveView('chat');
   };
 
   const handleAction = (value: string) => {
@@ -118,11 +142,12 @@ export function ChatbotWidget({
           suggestions: result.confidence === 'medium' ? result.suggestions.filter((item) => item.id !== result.item?.id) : undefined,
           confidence: result.confidence,
           matchedKnowledgeIds: items.map((item) => item.id),
+          handoffCta: result.confidence === 'low' || items.some((item) => item.handoffRecommended),
           id: event.id,
         }),
       );
     } else if (result.status === 'suggestions') {
-      nextMessages.push(createMessage('bot', '혹시 이 질문을 찾으셨나요?', { suggestions: result.suggestions, confidence: result.confidence, id: event.id }));
+      nextMessages.push(createMessage('bot', '혹시 이 질문을 찾으셨나요?', { suggestions: result.suggestions, confidence: result.confidence, handoffCta: true, id: event.id }));
     } else {
       setUnknownQuestions((current) => [...current, query]);
       onUnknownQuestion?.(query);
@@ -130,6 +155,7 @@ export function ChatbotWidget({
         createMessage('bot', botConfig.bot.fallbackMessage, {
           suggestions: getFallbackSuggestions(botConfig),
           confidence: result.confidence,
+          handoffCta: true,
           id: event.id,
         }),
       );
@@ -139,9 +165,28 @@ export function ChatbotWidget({
     setActiveView('chat');
   };
 
+  const handleRequestHandoff = (message: ChatMessage) => {
+    const messageIndex = messages.findIndex((item) => item.id === message.id);
+    const previousUserMessage = messageIndex > 0
+      ? [...messages.slice(0, messageIndex)].reverse().find((item) => item.role === 'user')
+      : undefined;
+    const source: TicketSource = message.confidence === 'low' ? 'fallback' : 'handoffRecommended';
+    openContactRequest(source, previousUserMessage?.text, message.matchedKnowledgeIds, message.id);
+  };
+
+  const handleTicketCreated = (ticket: Ticket) => {
+    onTicketCreated?.(ticket);
+    setContactRequest(null);
+    setMessages((current) => [
+      ...current,
+      createMessage('system', `상담 요청이 접수되었습니다. 티켓 번호는 ${ticket.id}입니다.`, { ticketId: ticket.id }),
+    ]);
+  };
+
   const resetConversation = () => {
     setMessages([createMessage('bot', botConfig.bot.greeting)]);
     setUnknownQuestions([]);
+    setContactRequest(null);
     setActiveView('chat');
   };
 
@@ -186,13 +231,27 @@ export function ChatbotWidget({
           <ChatView
             botConfig={botConfig}
             messages={messages}
+            contactRequest={contactRequest}
             onSubmit={handleSubmit}
             onQuestionSelect={handleQuestionSelect}
             onAction={handleAction}
             onFeedback={(messageId, feedback) => {
               updateConversationEventFeedback(messageId, feedback);
-              setMessages((current) => current.map((message) => (message.id === messageId ? { ...message, feedback } : message)));
+              setMessages((current) =>
+                current.map((message) => (message.id === messageId ? { ...message, feedback, handoffCta: feedback === 'not-helpful' || message.handoffCta } : message)),
+              );
+              if (feedback === 'not-helpful') {
+                const targetIndex = messages.findIndex((message) => message.id === messageId);
+                const target = messages[targetIndex];
+                const previousUserMessage = targetIndex > 0
+                  ? [...messages.slice(0, targetIndex)].reverse().find((message) => message.role === 'user')
+                  : undefined;
+                openContactRequest('negativeFeedback', previousUserMessage?.text, target?.matchedKnowledgeIds, messageId);
+              }
             }}
+            onRequestHandoff={handleRequestHandoff}
+            onCancelContactRequest={() => setContactRequest(null)}
+            onTicketCreated={handleTicketCreated}
           />
         ) : null}
         {activeView === 'conversations' ? (
