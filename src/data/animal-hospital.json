@@ -1,0 +1,133 @@
+{
+  "bot": {
+    "id": "animal-hospital",
+    "name": "포근동물병원",
+    "title": "반려동물 진료 상담",
+    "description": "예약, 진료시간, 주차, 예방접종을 안내드려요.",
+    "avatarUrl": "",
+    "greeting": "안녕하세요. 포근동물병원입니다. 진료와 예약 관련 질문을 남겨주세요.",
+    "fallbackMessage": "등록된 안내에서 정확한 답변을 찾지 못했어요. 아래 질문을 확인해 주세요.",
+    "disclaimer": "응급 증상은 즉시 병원으로 전화하거나 가까운 응급 병원을 방문해 주세요."
+  },
+  "theme": { "primaryColor": "#0E9F6E", "position": "bottom-right", "homeTitle": "Care Desk" },
+  "operation": { "botHours": "24시간 자동 안내", "csHours": "평일 10:00 ~ 19:00, 토요일 10:00 ~ 15:00" },
+  "notices": [
+    {
+      "id": "notice-ah-001",
+      "title": "여름철 심장사상충 예방 안내",
+      "summary": "월 1회 예방약 복용과 정기 검사를 권장합니다.",
+      "content": "모기 활동이 많은 계절에는 심장사상충 예방이 중요합니다. 체중에 맞는 약을 처방받아 매월 투약해 주세요.",
+      "createdAt": "2일 전",
+      "unread": true,
+      "imageUrl": "",
+      "buttons": [{ "label": "예방접종 문의", "type": "action", "value": "ask:vaccine-001" }]
+    }
+  ],
+  "contactChannels": [
+    { "id": "phone", "label": "전화 예약", "type": "tel", "value": "02-123-4567", "icon": "phone" },
+    { "id": "kakao", "label": "카카오 상담", "type": "url", "value": "https://pf.kakao.com/animal", "icon": "kakao" },
+    { "id": "map", "label": "오시는 길", "type": "url", "value": "https://example.com/map", "icon": "map" }
+  ],
+  "categories": [
+    { "id": "reservation", "name": "예약" },
+    { "id": "hours", "name": "운영시간" },
+    { "id": "care", "name": "진료" },
+    { "id": "access", "name": "주차/위치" }
+  ],
+  "quickReplies": [
+    { "label": "예약은 어떻게 하나요?", "knowledgeId": "reservation-001" },
+    { "label": "주차 가능해요?", "knowledgeId": "parking-001" },
+    { "label": "예방접종 비용이 궁금해요", "knowledgeId": "vaccine-001" },
+    { "label": "응급 진료가 되나요?", "knowledgeId": "emergency-001" }
+  ],
+  "knowledge": [
+    {
+      "id": "reservation-001",
+      "categoryId": "reservation",
+      "question": "예약은 어떻게 하나요?",
+      "keywords": ["예약", "접수", "진료예약", "방문"],
+      "aliases": ["예약하고 싶어요", "진료 접수 방법", "방문 예약"],
+      "answer": "전화 또는 카카오 상담으로 예약할 수 있습니다. 당일 진료는 대기 시간이 발생할 수 있어 사전 예약을 권장합니다.",
+      "buttons": [{ "label": "전화 예약", "type": "tel", "value": "02-123-4567" }],
+      "relatedIds": ["hours-001"],
+      "priority": 10
+    },
+    {
+      "id": "parking-001",
+      "categoryId": "access",
+      "question": "주차 가능해요?",
+      "keywords": ["주차", "주차장", "차", "발렛", "무료"],
+      "aliases": ["주차할 수 있나요?", "차 가져가도 되나요?", "무료 주차 되나요?"],
+      "answer": "건물 지하주차장을 1시간 무료로 이용할 수 있습니다. 접수 시 차량번호를 알려주세요.",
+      "buttons": [{ "label": "오시는 길", "type": "url", "value": "https://example.com/map" }],
+      "relatedIds": ["location-001"],
+      "priority": 10
+    },
+    {
+      "id": "hours-001",
+      "categoryId": "hours",
+      "question": "진료시간은 어떻게 되나요?",
+      "keywords": ["진료시간", "운영시간", "영업시간", "휴무"],
+      "aliases": ["몇 시까지 하나요?", "토요일 진료", "휴무일"],
+      "answer": "평일은 10시부터 19시까지, 토요일은 10시부터 15시까지 진료합니다. 일요일과 공휴일은 휴무입니다.",
+      "buttons": [],
+      "relatedIds": ["reservation-001"],
+      "priority": 9
+    },
+    {
+      "id": "vaccine-001",
+      "categoryId": "care",
+      "question": "예방접종 비용이 궁금해요.",
+      "keywords": ["예방접종", "백신", "비용", "강아지", "고양이"],
+      "aliases": ["백신 가격", "접종 상담", "종합백신"],
+      "answer": "예방접종 비용은 동물 종류, 나이, 접종 항목에 따라 달라집니다. 기본 종합백신은 방문 상담 후 안내드립니다.",
+      "buttons": [{ "label": "접종 문의", "type": "action", "value": "open-contact" }],
+      "relatedIds": ["reservation-001"],
+      "priority": 8
+    },
+    {
+      "id": "emergency-001",
+      "categoryId": "care",
+      "question": "응급 진료가 되나요?",
+      "keywords": ["응급", "야간", "위급", "사고", "구토"],
+      "aliases": ["야간 진료 있나요?", "응급실", "갑자기 아파요"],
+      "answer": "운영시간 내 응급 내원은 전화 후 방문해 주세요. 야간에는 가까운 24시 동물병원 방문을 권장합니다.",
+      "buttons": [{ "label": "전화하기", "type": "tel", "value": "02-123-4567" }],
+      "relatedIds": ["hours-001"],
+      "priority": 9
+    },
+    {
+      "id": "location-001",
+      "categoryId": "access",
+      "question": "병원 위치가 어디인가요?",
+      "keywords": ["위치", "주소", "오시는길", "지도"],
+      "aliases": ["어디에 있나요?", "주소 알려줘", "찾아가는 길"],
+      "answer": "서울시 예시구 반려로 12, 2층에 있습니다. 지하철 2번 출구에서 도보 4분 거리입니다.",
+      "buttons": [{ "label": "지도 보기", "type": "url", "value": "https://example.com/map" }],
+      "relatedIds": ["parking-001"],
+      "priority": 8
+    },
+    {
+      "id": "neuter-001",
+      "categoryId": "care",
+      "question": "중성화 수술 상담이 가능한가요?",
+      "keywords": ["중성화", "수술", "상담", "마취"],
+      "aliases": ["중성화 비용", "수술 예약", "마취 검사"],
+      "answer": "중성화 수술은 사전 검사 후 예약제로 진행합니다. 나이, 체중, 건강 상태에 따라 일정과 비용이 달라집니다.",
+      "buttons": [],
+      "relatedIds": ["reservation-001"],
+      "priority": 7
+    },
+    {
+      "id": "grooming-001",
+      "categoryId": "care",
+      "question": "미용도 하나요?",
+      "keywords": ["미용", "목욕", "발톱", "털"],
+      "aliases": ["강아지 미용", "고양이 미용", "목욕 가능한가요"],
+      "answer": "현재 일반 미용은 운영하지 않고, 진료와 함께 필요한 위생 미용만 제한적으로 진행합니다.",
+      "buttons": [],
+      "relatedIds": ["care-001"],
+      "priority": 5
+    }
+  ]
+}

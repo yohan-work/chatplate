@@ -1,0 +1,150 @@
+{
+  "bot": {
+    "id": "alf-demo",
+    "name": "ALF",
+    "title": "All-In-One 고객센터 위젯",
+    "description": "궁금한 점을 남겨주시면 빠르게 안내드리겠습니다.",
+    "avatarUrl": "",
+    "greeting": "안녕하세요, ALF입니다. 제품 소개, 설치, 계정, 요금 문의를 도와드릴게요.",
+    "fallbackMessage": "정확한 답변을 찾지 못했어요. 아래 질문 중 찾으시는 내용이 있을까요?",
+    "disclaimer": "AI는 한정된 데이터에 기반하니, 중요한 정보는 추가 확인을 권장해요."
+  },
+  "theme": {
+    "primaryColor": "#6C3BFF",
+    "position": "bottom-right",
+    "homeTitle": "Customer Driven"
+  },
+  "operation": {
+    "botHours": "24시간 연중무휴",
+    "csHours": "평일 09:00 ~ 17:00 (주말 및 공휴일 휴무)"
+  },
+  "notices": [
+    {
+      "id": "notice-001",
+      "title": "계정 보안 점검 안내",
+      "summary": "대규모 업데이트 후 일부 계정은 재로그인이 필요합니다.",
+      "content": "6월 보안 업데이트로 일부 세션이 자동 만료되었습니다. 계정 점검 가이드를 확인하고 재로그인해 주세요.",
+      "createdAt": "4일 전",
+      "unread": true,
+      "imageUrl": "",
+      "buttons": [{ "label": "계정 점검 가이드", "type": "url", "value": "https://example.com/account-check" }]
+    },
+    {
+      "id": "notice-002",
+      "title": "새 위젯 테마 출시",
+      "summary": "브랜드 컬러를 더 자연스럽게 적용하는 테마 옵션이 추가되었습니다.",
+      "content": "관리자 설정에서 위젯 primary color와 홈 타이틀을 도메인별로 바꿀 수 있습니다.",
+      "createdAt": "1주 전",
+      "unread": false,
+      "imageUrl": "",
+      "buttons": [{ "label": "테마 설정 보기", "type": "url", "value": "https://example.com/theme" }]
+    }
+  ],
+  "contactChannels": [
+    { "id": "kakao", "label": "카카오톡", "type": "url", "value": "https://pf.kakao.com/example", "icon": "kakao" },
+    { "id": "naver", "label": "네이버톡톡", "type": "url", "value": "https://talk.naver.com/example", "icon": "naver" },
+    { "id": "phone", "label": "전화 문의", "type": "tel", "value": "02-0000-0000", "icon": "phone" }
+  ],
+  "categories": [
+    { "id": "intro", "name": "서비스 소개" },
+    { "id": "install", "name": "설치" },
+    { "id": "account", "name": "계정" },
+    { "id": "billing", "name": "요금" }
+  ],
+  "quickReplies": [
+    { "label": "ALF는 무엇인가요?", "knowledgeId": "intro-001" },
+    { "label": "설치는 어떻게 하나요?", "knowledgeId": "install-001" },
+    { "label": "요금제는 어떻게 되나요?", "knowledgeId": "billing-001" },
+    { "label": "계정 초대는 어떻게 하나요?", "knowledgeId": "account-001" }
+  ],
+  "knowledge": [
+    {
+      "id": "intro-001",
+      "categoryId": "intro",
+      "question": "ALF는 무엇인가요?",
+      "keywords": ["ALF", "고객센터", "챗봇", "소개", "기능"],
+      "aliases": ["이 서비스는 무엇인가요?", "ALF가 뭐예요?", "챗봇 소개해줘"],
+      "answer": "ALF는 자주 묻는 질문, 공지, 계정 안내, 설치 방법을 한 위젯에서 안내하는 고객상담 도우미입니다.",
+      "buttons": [{ "label": "도입 상담받기", "type": "action", "value": "open-contact" }],
+      "relatedIds": ["install-001", "billing-001"],
+      "priority": 10
+    },
+    {
+      "id": "install-001",
+      "categoryId": "install",
+      "question": "설치는 어떻게 하나요?",
+      "keywords": ["설치", "도입", "스크립트", "사이트", "연동"],
+      "aliases": ["사이트에 어떻게 붙이나요?", "설치 방법 알려줘", "스크립트 삽입은 어떻게 하나요?"],
+      "answer": "사이트의 공통 레이아웃에 제공된 설치 스크립트를 삽입하면 위젯을 사용할 수 있습니다. MVP에서는 React 컴포넌트로 실행됩니다.",
+      "buttons": [{ "label": "설치 가이드 보기", "type": "url", "value": "https://example.com/install" }],
+      "relatedIds": ["intro-001", "theme-001"],
+      "priority": 9
+    },
+    {
+      "id": "theme-001",
+      "categoryId": "install",
+      "question": "브랜드 색상은 바꿀 수 있나요?",
+      "keywords": ["브랜드", "색상", "테마", "primary", "컬러"],
+      "aliases": ["테마 변경 가능한가요?", "위젯 색 바꾸기", "브랜드 컬러 적용"],
+      "answer": "bot config의 theme.primaryColor와 homeTitle을 변경하면 위젯의 주요 색상과 홈 타이틀이 바뀝니다.",
+      "buttons": [],
+      "relatedIds": ["install-001"],
+      "priority": 8
+    },
+    {
+      "id": "account-001",
+      "categoryId": "account",
+      "question": "팀원을 계정에 초대하려면 어떻게 하나요?",
+      "keywords": ["계정", "초대", "팀원", "권한", "멤버"],
+      "aliases": ["멤버 초대 방법", "팀원 추가", "권한 부여"],
+      "answer": "관리자 설정의 멤버 메뉴에서 이메일을 입력해 팀원을 초대할 수 있습니다. 권한은 관리자와 운영자로 나눌 수 있습니다.",
+      "buttons": [],
+      "relatedIds": ["account-002"],
+      "priority": 8
+    },
+    {
+      "id": "account-002",
+      "categoryId": "account",
+      "question": "비밀번호를 잊어버렸어요.",
+      "keywords": ["비밀번호", "로그인", "재설정", "계정"],
+      "aliases": ["로그인이 안 돼요", "비번 찾기", "암호 재설정"],
+      "answer": "로그인 화면의 비밀번호 재설정을 선택하고 가입 이메일로 받은 링크에서 새 비밀번호를 설정해 주세요.",
+      "buttons": [{ "label": "비밀번호 재설정", "type": "url", "value": "https://example.com/reset-password" }],
+      "relatedIds": ["account-001"],
+      "priority": 9
+    },
+    {
+      "id": "billing-001",
+      "categoryId": "billing",
+      "question": "요금제는 어떻게 되나요?",
+      "keywords": ["요금", "가격", "플랜", "결제", "무료"],
+      "aliases": ["가격 알려줘", "플랜이 궁금해요", "무료 사용 가능한가요?"],
+      "answer": "MVP 샘플에서는 무료, 성장, 비즈니스 플랜을 가정합니다. 실제 요금은 도메인별 데이터로 교체해 안내할 수 있습니다.",
+      "buttons": [{ "label": "요금표 보기", "type": "url", "value": "https://example.com/pricing" }],
+      "relatedIds": ["billing-002"],
+      "priority": 8
+    },
+    {
+      "id": "billing-002",
+      "categoryId": "billing",
+      "question": "영수증은 어디서 받을 수 있나요?",
+      "keywords": ["영수증", "세금계산서", "결제내역", "청구"],
+      "aliases": ["결제 내역 확인", "세금계산서 발행", "청구서 다운로드"],
+      "answer": "관리자 설정의 결제 내역에서 영수증을 내려받을 수 있습니다. 세금계산서는 사업자 정보 등록 후 발행됩니다.",
+      "buttons": [],
+      "relatedIds": ["billing-001"],
+      "priority": 7
+    },
+    {
+      "id": "notice-knowledge-001",
+      "categoryId": "account",
+      "question": "최근 보안 점검은 무엇인가요?",
+      "keywords": ["보안", "점검", "로그아웃", "업데이트"],
+      "aliases": ["왜 로그아웃됐나요?", "계정 점검 안내", "보안 업데이트"],
+      "answer": "최근 보안 업데이트로 일부 계정의 세션이 만료되었습니다. 재로그인 후 계정 정보를 점검해 주세요.",
+      "buttons": [{ "label": "공지 자세히 보기", "type": "action", "value": "open-notice:notice-001" }],
+      "relatedIds": ["account-002"],
+      "priority": 8
+    }
+  ]
+}

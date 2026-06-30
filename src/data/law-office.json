@@ -1,0 +1,132 @@
+{
+  "bot": {
+    "id": "law-office",
+    "name": "정온 법률사무소",
+    "title": "법률 상담 접수 안내",
+    "description": "상담 예약, 비용, 준비서류를 안내합니다.",
+    "avatarUrl": "",
+    "greeting": "안녕하세요. 정온 법률사무소입니다. 상담 분야와 방문 가능 시간을 알려주세요.",
+    "fallbackMessage": "정확한 안내를 찾지 못했습니다. 자주 묻는 질문을 먼저 확인해 주세요.",
+    "disclaimer": "이 안내는 일반 정보이며 구체적 법률 의견은 변호사 상담을 통해 확인해야 합니다."
+  },
+  "theme": { "primaryColor": "#243B53", "position": "bottom-right", "homeTitle": "Legal Desk" },
+  "operation": { "botHours": "24시간 상담 접수", "csHours": "평일 09:30 ~ 18:30" },
+  "notices": [
+    {
+      "id": "notice-law-001",
+      "title": "초기 상담 예약제 운영",
+      "summary": "상담 품질을 위해 모든 초기 상담은 예약제로 진행합니다.",
+      "content": "방문 전 사건 분야, 상대방 정보, 관련 서류를 알려주시면 이해충돌 확인 후 상담 일정을 안내드립니다.",
+      "createdAt": "3일 전",
+      "unread": true,
+      "imageUrl": "",
+      "buttons": [{ "label": "상담 예약", "type": "action", "value": "open-contact" }]
+    }
+  ],
+  "contactChannels": [
+    { "id": "phone", "label": "전화 문의", "type": "tel", "value": "02-555-0199", "icon": "phone" },
+    { "id": "email", "label": "이메일", "type": "mailto", "value": "contact@example-law.com", "icon": "email" }
+  ],
+  "categories": [
+    { "id": "reservation", "name": "상담예약" },
+    { "id": "fee", "name": "비용" },
+    { "id": "documents", "name": "서류" },
+    { "id": "cases", "name": "사건분야" }
+  ],
+  "quickReplies": [
+    { "label": "상담 예약은 어떻게 하나요?", "knowledgeId": "law-reservation-001" },
+    { "label": "상담 비용이 얼마인가요?", "knowledgeId": "law-fee-001" },
+    { "label": "준비서류가 있나요?", "knowledgeId": "law-docs-001" },
+    { "label": "비밀 보장이 되나요?", "knowledgeId": "law-privacy-001" }
+  ],
+  "knowledge": [
+    {
+      "id": "law-reservation-001",
+      "categoryId": "reservation",
+      "question": "상담 예약은 어떻게 하나요?",
+      "keywords": ["상담", "예약", "방문", "전화"],
+      "aliases": ["예약하고 싶습니다", "방문 상담", "상담 신청"],
+      "answer": "전화 또는 이메일로 사건 분야와 희망 일정을 남겨주세요. 이해충돌 확인 후 가능한 시간을 안내드립니다.",
+      "buttons": [{ "label": "전화 문의", "type": "tel", "value": "02-555-0199" }],
+      "relatedIds": ["law-docs-001"],
+      "priority": 10
+    },
+    {
+      "id": "law-fee-001",
+      "categoryId": "fee",
+      "question": "상담 비용이 얼마인가요?",
+      "keywords": ["비용", "상담료", "가격", "수임료"],
+      "aliases": ["상담료 알려주세요", "변호사 비용", "수임료 문의"],
+      "answer": "초기 상담료는 상담 분야와 시간에 따라 달라집니다. 예약 시 예상 상담료와 결제 방법을 안내드립니다.",
+      "buttons": [],
+      "relatedIds": ["law-reservation-001"],
+      "priority": 9
+    },
+    {
+      "id": "law-docs-001",
+      "categoryId": "documents",
+      "question": "준비서류가 있나요?",
+      "keywords": ["서류", "자료", "준비물", "계약서", "소장"],
+      "aliases": ["뭘 가져가야 하나요?", "상담 준비", "필요 자료"],
+      "answer": "계약서, 문자, 이메일, 송금 내역, 법원 문서 등 사건과 관련된 자료를 가능한 범위에서 준비해 주세요.",
+      "buttons": [],
+      "relatedIds": ["law-reservation-001"],
+      "priority": 8
+    },
+    {
+      "id": "law-privacy-001",
+      "categoryId": "reservation",
+      "question": "상담 내용은 비밀 보장이 되나요?",
+      "keywords": ["비밀", "보안", "개인정보", "비공개"],
+      "aliases": ["상담 내용 보호", "비밀 유지", "개인정보 처리"],
+      "answer": "상담 과정에서 제공된 정보는 변호사 윤리와 개인정보 처리 기준에 따라 보호됩니다.",
+      "buttons": [],
+      "relatedIds": ["law-docs-001"],
+      "priority": 8
+    },
+    {
+      "id": "law-divorce-001",
+      "categoryId": "cases",
+      "question": "이혼 상담도 가능한가요?",
+      "keywords": ["이혼", "양육권", "재산분할", "가사"],
+      "aliases": ["가사 사건", "양육비 상담", "재산분할"],
+      "answer": "이혼, 양육권, 양육비, 재산분할 상담이 가능합니다. 혼인 기간과 쟁점 자료를 준비해 주세요.",
+      "buttons": [],
+      "relatedIds": ["law-reservation-001"],
+      "priority": 7
+    },
+    {
+      "id": "law-labor-001",
+      "categoryId": "cases",
+      "question": "노동 사건 상담이 가능한가요?",
+      "keywords": ["노동", "해고", "임금", "퇴직금"],
+      "aliases": ["부당해고", "임금체불", "퇴직금 문의"],
+      "answer": "해고 통지서, 근로계약서, 급여명세서, 출퇴근 기록을 준비하면 노동 사건 상담에 도움이 됩니다.",
+      "buttons": [],
+      "relatedIds": ["law-docs-001"],
+      "priority": 7
+    },
+    {
+      "id": "law-criminal-001",
+      "categoryId": "cases",
+      "question": "형사 사건 상담이 가능한가요?",
+      "keywords": ["형사", "고소", "경찰", "피의자"],
+      "aliases": ["고소장", "경찰 조사", "형사 변호"],
+      "answer": "형사 사건은 조사 일정, 고소장, 통지서 등 진행 상황을 알려주시면 긴급도를 확인해 안내드립니다.",
+      "buttons": [],
+      "relatedIds": ["law-reservation-001"],
+      "priority": 8
+    },
+    {
+      "id": "law-online-001",
+      "categoryId": "reservation",
+      "question": "온라인 상담도 가능한가요?",
+      "keywords": ["온라인", "화상", "비대면", "줌"],
+      "aliases": ["비대면 상담", "화상 상담", "온라인으로 가능"],
+      "answer": "사건 성격에 따라 화상 상담이 가능합니다. 신분 확인과 자료 공유 방식은 예약 시 안내드립니다.",
+      "buttons": [],
+      "relatedIds": ["law-reservation-001"],
+      "priority": 6
+    }
+  ]
+}
