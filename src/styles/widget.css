@@ -100,7 +100,9 @@
 
 .widget-topbar__brand span,
 .chat-header span {
-  display: block;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   overflow: hidden;
   color: var(--color-text-tertiary);
   font-size: 12px;
