@@ -1,6 +1,6 @@
 export type WidgetView = 'home' | 'chat' | 'conversations' | 'settings' | 'notice';
 
-export type AdminPanelView = 'bot' | 'operation' | 'notices' | 'knowledge' | 'quickReplies' | 'quality' | 'logs';
+export type AdminPanelView = 'bot' | 'operation' | 'notices' | 'knowledge' | 'quickReplies' | 'quality' | 'data' | 'logs';
 
 export type ButtonType = 'url' | 'action' | 'tel' | 'mailto';
 

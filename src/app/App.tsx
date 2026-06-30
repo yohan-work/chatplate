@@ -42,6 +42,7 @@ export function App() {
       unknownQuestions={unknownQuestionsByBotId[selectedBotId] ?? []}
       onSelectBot={setSelectedBotId}
       onUpdateBotConfig={updateSelectedBotConfig}
+      onReplaceBotConfigs={setEditableBotConfigs}
       onResetBot={resetSelectedBot}
       onUnknownQuestion={handleUnknownQuestion}
     />

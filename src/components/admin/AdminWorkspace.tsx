@@ -11,6 +11,7 @@ import {
   Settings,
   Sparkles,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import { searchKnowledge } from '../../engine/searchKnowledge';
 import type { AdminPanelView, BotConfig, BotConfigMap, KnowledgeItem, Notice, QuickReply } from '../../types/chatbot';
@@ -23,6 +24,7 @@ import {
   removeKnowledgeItem,
 } from '../../utils/adminBotConfig';
 import { clearConversationEvents, loadConversationEvents } from '../../utils/conversationEvents';
+import { conversationEventsToCsv, parseBotConfigJson, stringifyJson } from '../../utils/dataPortability';
 import { ChatbotLauncher } from '../widget/ChatbotLauncher';
 import { ChatbotWidget } from '../widget/ChatbotWidget';
 
@@ -32,6 +34,7 @@ interface AdminWorkspaceProps {
   unknownQuestions: string[];
   onSelectBot: (botId: string) => void;
   onUpdateBotConfig: (updater: (config: BotConfig) => BotConfig) => void;
+  onReplaceBotConfigs: (configs: BotConfigMap) => void;
   onResetBot: () => void;
   onUnknownQuestion: (question: string) => void;
 }
@@ -43,6 +46,7 @@ const panelItems: Array<{ id: AdminPanelView; label: string; icon: typeof Bot }>
   { id: 'knowledge', label: 'FAQ', icon: Search },
   { id: 'quickReplies', label: '추천 질문', icon: ListChecks },
   { id: 'quality', label: '검색 품질', icon: Sparkles },
+  { id: 'data', label: '데이터', icon: Upload },
   { id: 'logs', label: '실패 질문', icon: MessageSquareWarning },
 ];
 
@@ -468,9 +472,13 @@ function SearchQualityPanel({
   onUpdate: (updater: (config: BotConfig) => BotConfig) => void;
 }) {
   const [query, setQuery] = useState(unknownQuestions[0] ?? '');
+  const [eventVersion, setEventVersion] = useState(0);
   const result = useMemo(() => (query.trim() ? searchKnowledge(query, config) : null), [config, query]);
   const matchedItem = result?.item;
-  const events = loadConversationEvents().filter((event) => event.botId === config.bot.id);
+  const events = useMemo(
+    () => loadConversationEvents().filter((event) => event.botId === config.bot.id),
+    [config.bot.id, eventVersion],
+  );
   const lowConfidenceCount = events.filter((event) => event.confidence === 'low').length;
   const negativeFeedbackCount = events.filter((event) => event.feedback === 'not-helpful').length;
 
@@ -517,7 +525,14 @@ function SearchQualityPanel({
           <strong>{negativeFeedbackCount}</strong>
           <span>부정 피드백</span>
         </div>
-        <button className="admin-reset-button" type="button" onClick={() => clearConversationEvents()}>
+        <button
+          className="admin-reset-button"
+          type="button"
+          onClick={() => {
+            clearConversationEvents();
+            setEventVersion((current) => current + 1);
+          }}
+        >
           로그 초기화
         </button>
       </div>
@@ -583,6 +598,123 @@ function SearchQualityPanel({
   );
 }
 
+function downloadTextFile(filename: string, content: string, mimeType = 'application/json'): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function DataPortabilityPanel({
+  botConfigs,
+  selectedBotId,
+  onReplaceBotConfigs,
+}: {
+  botConfigs: BotConfigMap;
+  selectedBotId: string;
+  onReplaceBotConfigs: (configs: BotConfigMap) => void;
+}) {
+  const [importStatus, setImportStatus] = useState('');
+  const selectedConfig = botConfigs[selectedBotId];
+  const events = loadConversationEvents();
+  const scriptSnippet = `<script src="/widget.js" data-bot-id="${selectedBotId}"></script>`;
+  const initSnippet = `<script src="/widget.js" data-auto-init="false"></script>
+<script>
+  window.Chatplate.init({ botId: "${selectedBotId}" });
+</script>`;
+
+  const copySnippet = async (snippet: string) => {
+    await navigator.clipboard?.writeText(snippet);
+    setImportStatus('임베드 코드가 클립보드에 복사되었습니다.');
+  };
+
+  const handleImport = (file: File | undefined) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = parseBotConfigJson(String(reader.result ?? ''));
+      if (!result.configs) {
+        setImportStatus(`가져오기 실패: ${result.errors.slice(0, 3).join(' / ')}`);
+        return;
+      }
+
+      onReplaceBotConfigs({ ...botConfigs, ...result.configs });
+      setImportStatus(`${Object.keys(result.configs).length}개 bot config를 가져왔습니다.`);
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <section className="admin-panel">
+      <PanelHeader title="데이터 / 임베드" description="관리 데이터를 파일로 옮기고, 외부 사이트에 붙일 위젯 코드를 확인합니다." />
+
+      <div className="data-grid">
+        <div className="data-card">
+          <h3>Bot config 내보내기</h3>
+          <p>현재 선택한 봇 또는 전체 봇 데이터를 JSON 파일로 저장합니다.</p>
+          <div className="data-actions">
+            <button type="button" onClick={() => downloadTextFile(`${selectedBotId}.json`, stringifyJson(selectedConfig))}>
+              현재 봇 JSON
+            </button>
+            <button type="button" onClick={() => downloadTextFile('chatplate-bot-configs.json', stringifyJson(botConfigs))}>
+              전체 JSON
+            </button>
+          </div>
+        </div>
+
+        <div className="data-card">
+          <h3>Bot config 가져오기</h3>
+          <p>단일 bot config 또는 bot config map JSON을 가져와 localStorage에 저장합니다.</p>
+          <label className="import-button">
+            <input type="file" accept="application/json,.json" onChange={(event) => handleImport(event.target.files?.[0])} />
+            JSON 파일 선택
+          </label>
+          {importStatus ? <p className="data-status">{importStatus}</p> : null}
+        </div>
+
+        <div className="data-card">
+          <h3>운영 로그 내보내기</h3>
+          <p>질문 원문이 포함될 수 있습니다. 외부 공유 전 개인정보 포함 여부를 확인하세요.</p>
+          <div className="data-actions">
+            <button type="button" onClick={() => downloadTextFile('chatplate-events.json', stringifyJson(events))}>
+              로그 JSON
+            </button>
+            <button type="button" onClick={() => downloadTextFile('chatplate-events.csv', conversationEventsToCsv(events), 'text/csv')}>
+              로그 CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                clearConversationEvents();
+                setImportStatus('운영 로그를 초기화했습니다.');
+              }}
+            >
+              로그 초기화
+            </button>
+          </div>
+        </div>
+
+        <div className="data-card data-card--wide">
+          <h3>외부 사이트 삽입 코드</h3>
+          <p>정적 빌드 후 생성되는 `widget.js`를 외부 페이지에 삽입합니다.</p>
+          <pre>{scriptSnippet}</pre>
+          <div className="data-actions">
+            <button type="button" onClick={() => copySnippet(scriptSnippet)}>
+              기본 코드 복사
+            </button>
+            <button type="button" onClick={() => copySnippet(initSnippet)}>
+              고급 코드 복사
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function PanelHeader({
   title,
   description,
@@ -618,7 +750,10 @@ function renderActivePanel(
   activeView: AdminPanelView,
   config: BotConfig,
   unknownQuestions: string[],
+  botConfigs: BotConfigMap,
+  selectedBotId: string,
   onUpdate: (updater: (config: BotConfig) => BotConfig) => void,
+  onReplaceBotConfigs: (configs: BotConfigMap) => void,
 ) {
   if (activeView === 'bot') return <BotSettingsForm config={config} onUpdate={onUpdate} />;
   if (activeView === 'operation') return <OperationSettingsForm config={config} onUpdate={onUpdate} />;
@@ -626,6 +761,7 @@ function renderActivePanel(
   if (activeView === 'knowledge') return <KnowledgeEditor config={config} onUpdate={onUpdate} />;
   if (activeView === 'quickReplies') return <QuickReplyEditor config={config} onUpdate={onUpdate} />;
   if (activeView === 'quality') return <SearchQualityPanel config={config} unknownQuestions={unknownQuestions} onUpdate={onUpdate} />;
+  if (activeView === 'data') return <DataPortabilityPanel botConfigs={botConfigs} selectedBotId={selectedBotId} onReplaceBotConfigs={onReplaceBotConfigs} />;
   return <UnknownQuestionsPanel questions={unknownQuestions} />;
 }
 
@@ -635,6 +771,7 @@ export function AdminWorkspace({
   unknownQuestions,
   onSelectBot,
   onUpdateBotConfig,
+  onReplaceBotConfigs,
   onResetBot,
   onUnknownQuestion,
 }: AdminWorkspaceProps) {
@@ -663,7 +800,9 @@ export function AdminWorkspace({
         onResetBot={onResetBot}
       />
 
-      <div className="admin-content">{renderActivePanel(activeView, selectedConfig, unknownQuestions, onUpdateBotConfig)}</div>
+      <div className="admin-content">
+        {renderActivePanel(activeView, selectedConfig, unknownQuestions, botConfigs, selectedBotId, onUpdateBotConfig, onReplaceBotConfigs)}
+      </div>
 
       <aside className="widget-preview" aria-label="실제 사용자 챗봇 미리보기">
         <div className="widget-preview__header">
