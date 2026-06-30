@@ -1,3 +1,21 @@
+.chatplate-widget,
+.chatplate-widget *,
+.chatplate-launcher,
+.chatplate-launcher * {
+  box-sizing: border-box;
+}
+
+.chatplate-widget button,
+.chatplate-widget input,
+.chatplate-widget select {
+  font: inherit;
+}
+
+.chatplate-widget button,
+.chatplate-launcher {
+  cursor: pointer;
+}
+
 .chatplate-launcher {
   position: fixed;
   right: 24px;

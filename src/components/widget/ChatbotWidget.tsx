@@ -4,7 +4,7 @@ import { Bot, RotateCcw, X } from 'lucide-react';
 import { getFallbackSuggestions } from '../../engine/getFallbackSuggestions';
 import { findKnowledgeById, searchKnowledge } from '../../engine/searchKnowledge';
 import { appendConversationEvent, createConversationEvent, updateConversationEventFeedback } from '../../utils/conversationEvents';
-import type { BotConfig, ChatMessage, KnowledgeItem, Notice, WidgetView } from '../../types/chatbot';
+import type { BotConfig, ChatMessage, KnowledgeItem, Notice, SearchResult, WidgetView } from '../../types/chatbot';
 import { BottomNavigation } from './BottomNavigation';
 import { HomeView } from '../home/HomeView';
 import { ChatView } from '../chat/ChatView';
@@ -17,6 +17,7 @@ interface ChatbotWidgetProps {
   isOpen: boolean;
   onClose: () => void;
   onUnknownQuestion?: (question: string) => void;
+  onSearchResult?: (query: string, result: SearchResult) => void;
 }
 
 function createMessage(role: ChatMessage['role'], text: string, extra?: Partial<ChatMessage>): ChatMessage {
@@ -39,6 +40,7 @@ export function ChatbotWidget({
   isOpen,
   onClose,
   onUnknownQuestion,
+  onSearchResult,
 }: ChatbotWidgetProps) {
   const [activeView, setActiveView] = useState<WidgetView>('home');
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
@@ -104,6 +106,7 @@ export function ChatbotWidget({
     const nextMessages: ChatMessage[] = [createMessage('user', query)];
     const event = createConversationEvent(botConfig.bot.id, query, result);
     appendConversationEvent(event);
+    onSearchResult?.(query, result);
 
     if (result.status === 'answer' && result.item) {
       const items = result.items ?? [result.item];
