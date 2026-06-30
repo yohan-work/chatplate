@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { Bot, RotateCcw, X } from 'lucide-react';
 import { getFallbackSuggestions } from '../../engine/getFallbackSuggestions';
 import { findKnowledgeById, searchKnowledge } from '../../engine/searchKnowledge';
+import { appendConversationEvent, createConversationEvent, updateConversationEventFeedback } from '../../utils/conversationEvents';
 import type { BotConfig, ChatMessage, KnowledgeItem, Notice, WidgetView } from '../../types/chatbot';
 import { BottomNavigation } from './BottomNavigation';
 import { HomeView } from '../home/HomeView';
@@ -26,6 +27,11 @@ function createMessage(role: ChatMessage['role'], text: string, extra?: Partial<
     createdAt: new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit' }).format(new Date()),
     ...extra,
   };
+}
+
+function confidencePrefix(confidence: ChatMessage['confidence']): string {
+  if (confidence === 'medium') return '가장 가까운 답변이에요.\n\n';
+  return '';
 }
 
 export function ChatbotWidget({
@@ -96,16 +102,33 @@ export function ChatbotWidget({
   const handleSubmit = (query: string) => {
     const result = searchKnowledge(query, botConfig);
     const nextMessages: ChatMessage[] = [createMessage('user', query)];
+    const event = createConversationEvent(botConfig.bot.id, query, result);
+    appendConversationEvent(event);
 
     if (result.status === 'answer' && result.item) {
-      nextMessages.push(createMessage('bot', result.item.answer, { buttons: result.item.buttons }));
+      const items = result.items ?? [result.item];
+      const answerText = items.map((item) => item.answer).join('\n\n');
+      nextMessages.push(
+        createMessage('bot', `${confidencePrefix(result.confidence)}${answerText}`, {
+          buttons: result.item.buttons,
+          relatedQuestions: result.alternatives,
+          suggestions: result.confidence === 'medium' ? result.suggestions.filter((item) => item.id !== result.item?.id) : undefined,
+          confidence: result.confidence,
+          matchedKnowledgeIds: items.map((item) => item.id),
+          id: event.id,
+        }),
+      );
     } else if (result.status === 'suggestions') {
-      nextMessages.push(createMessage('bot', '혹시 이 질문을 찾으셨나요?', { suggestions: result.suggestions }));
+      nextMessages.push(createMessage('bot', '혹시 이 질문을 찾으셨나요?', { suggestions: result.suggestions, confidence: result.confidence, id: event.id }));
     } else {
       setUnknownQuestions((current) => [...current, query]);
       onUnknownQuestion?.(query);
       nextMessages.push(
-        createMessage('bot', botConfig.bot.fallbackMessage, { suggestions: getFallbackSuggestions(botConfig) }),
+        createMessage('bot', botConfig.bot.fallbackMessage, {
+          suggestions: getFallbackSuggestions(botConfig),
+          confidence: result.confidence,
+          id: event.id,
+        }),
       );
     }
 
@@ -163,6 +186,10 @@ export function ChatbotWidget({
             onSubmit={handleSubmit}
             onQuestionSelect={handleQuestionSelect}
             onAction={handleAction}
+            onFeedback={(messageId, feedback) => {
+              updateConversationEventFeedback(messageId, feedback);
+              setMessages((current) => current.map((message) => (message.id === messageId ? { ...message, feedback } : message)));
+            }}
           />
         ) : null}
         {activeView === 'conversations' ? (

@@ -11,9 +11,10 @@ interface ChatViewProps {
   onSubmit: (query: string) => void;
   onQuestionSelect: (item: KnowledgeItem) => void;
   onAction: (value: string) => void;
+  onFeedback: (messageId: string, feedback: 'helpful' | 'not-helpful') => void;
 }
 
-export function ChatView({ botConfig, messages, onSubmit, onQuestionSelect, onAction }: ChatViewProps) {
+export function ChatView({ botConfig, messages, onSubmit, onQuestionSelect, onAction, onFeedback }: ChatViewProps) {
   return (
     <div className="chat-view">
       <div className="chat-header">
@@ -39,7 +40,7 @@ export function ChatView({ botConfig, messages, onSubmit, onQuestionSelect, onAc
 
       <div className="message-list" aria-live="polite">
         {messages.map((message) => (
-          <ChatBubble key={message.id} message={message} onQuestionSelect={onQuestionSelect} onAction={onAction} />
+          <ChatBubble key={message.id} message={message} onQuestionSelect={onQuestionSelect} onAction={onAction} onFeedback={onFeedback} />
         ))}
       </div>
 

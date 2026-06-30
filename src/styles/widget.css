@@ -380,8 +380,10 @@
 .quick-list,
 .bubble-actions,
 .suggestion-list,
+.related-list,
 .quick-replies,
-.settings-channels {
+.settings-channels,
+.feedback-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -456,7 +458,8 @@
 }
 
 .quick-replies button,
-.suggestion-list button {
+.suggestion-list button,
+.related-list button {
   flex: 0 0 auto;
   max-width: 260px;
   min-height: 34px;
@@ -470,6 +473,18 @@
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.related-list {
+  padding-top: 2px;
+}
+
+.related-list::before {
+  content: "관련 질문";
+  flex-basis: 100%;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .message-list {
@@ -519,6 +534,31 @@
 
 .chat-bubble--user time {
   color: rgba(255, 255, 255, 0.72);
+}
+
+.feedback-row {
+  padding-top: 2px;
+}
+
+.feedback-row button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.feedback-row button.is-selected {
+  color: var(--chatplate-primary);
+  border-color: var(--chatplate-primary);
+  background: var(--color-primary-light);
+}
+
+.feedback-row button:disabled {
+  cursor: default;
 }
 
 .disclaimer {
