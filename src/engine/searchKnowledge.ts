@@ -1,29 +1,40 @@
 import type { BotConfig, KnowledgeItem, SearchResult } from '../types/chatbot';
-import { scoreKnowledge } from './scoreKnowledge';
+import { analyzeQuery } from './analyzeQuery';
+import { buildSearchIndex } from './buildSearchIndex';
+import { composeMultiIntentItems, decideSearchResult, HIGH_CONFIDENCE_THRESHOLD, MEDIUM_CONFIDENCE_THRESHOLD } from './decideSearchResult';
+import { rankKnowledge } from './rankKnowledge';
 
-export const ANSWER_THRESHOLD = 52;
-export const SUGGESTION_THRESHOLD = 24;
+export const ANSWER_THRESHOLD = HIGH_CONFIDENCE_THRESHOLD;
+export const SUGGESTION_THRESHOLD = MEDIUM_CONFIDENCE_THRESHOLD;
 
 export function searchKnowledge(query: string, botConfig: BotConfig): SearchResult {
-  const ranked = botConfig.knowledge
-    .map((item) => ({ item, score: scoreKnowledge(query, item) }))
-    .sort((a, b) => b.score - a.score);
+  const analysis = analyzeQuery(query);
+  const index = buildSearchIndex(botConfig);
+  const ranked = rankKnowledge(analysis, index);
+  const result = decideSearchResult(ranked);
 
-  const top = ranked[0];
-  const suggestions = ranked
-    .filter((entry) => entry.score >= SUGGESTION_THRESHOLD)
-    .slice(0, 3)
-    .map((entry) => entry.item);
+  if (analysis.intents.length > 1) {
+    const intentResults = analysis.intents.map((intent) => {
+      const intentAnalysis = analyzeQuery(intent);
+      return decideSearchResult(rankKnowledge(intentAnalysis, index));
+    });
+    const items = composeMultiIntentItems(intentResults);
 
-  if (top && top.score >= ANSWER_THRESHOLD) {
-    return { status: 'answer', score: top.score, item: top.item, suggestions };
+    if (items.length > 1) {
+      return {
+        ...result,
+        status: 'answer',
+        confidence: intentResults.some((entry) => entry.confidence === 'medium') ? 'medium' : 'high',
+        item: items[0],
+        items,
+        suggestions: items,
+        alternatives: result.alternatives,
+        matchedFields: [...new Set(intentResults.flatMap((entry) => entry.matchedFields))],
+      };
+    }
   }
 
-  if (suggestions.length > 0) {
-    return { status: 'suggestions', score: top?.score ?? 0, suggestions };
-  }
-
-  return { status: 'fallback', score: top?.score ?? 0, suggestions: [] };
+  return result;
 }
 
 export function findKnowledgeById(botConfig: BotConfig, id: string): KnowledgeItem | undefined {

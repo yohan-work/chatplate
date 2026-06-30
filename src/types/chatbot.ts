@@ -1,6 +1,6 @@
 export type WidgetView = 'home' | 'chat' | 'conversations' | 'settings' | 'notice';
 
-export type AdminPanelView = 'bot' | 'operation' | 'notices' | 'knowledge' | 'quickReplies' | 'logs';
+export type AdminPanelView = 'bot' | 'operation' | 'notices' | 'knowledge' | 'quickReplies' | 'quality' | 'logs';
 
 export type ButtonType = 'url' | 'action' | 'tel' | 'mailto';
 
@@ -67,10 +67,16 @@ export interface KnowledgeItem {
   question: string;
   keywords: string[];
   aliases: string[];
+  tags?: string[];
+  negativeKeywords?: string[];
   answer: string;
   buttons: AnswerButton[];
   relatedIds: string[];
   priority: number;
+  status?: 'active' | 'draft' | 'archived';
+  lastUpdated?: string;
+  source?: string;
+  handoffRecommended?: boolean;
 }
 
 export interface BotConfig {
@@ -93,11 +99,46 @@ export interface ChatMessage {
   createdAt: string;
   buttons?: AnswerButton[];
   suggestions?: KnowledgeItem[];
+  relatedQuestions?: KnowledgeItem[];
+  confidence?: SearchConfidence;
+  matchedKnowledgeIds?: string[];
+  feedback?: 'helpful' | 'not-helpful';
+}
+
+export type SearchConfidence = 'high' | 'medium' | 'low';
+
+export type MatchedField = 'question' | 'alias' | 'keyword' | 'tag';
+
+export interface SearchScoreBreakdown {
+  exact: number;
+  alias: number;
+  keyword: number;
+  tag: number;
+  token: number;
+  typo: number;
+  priority: number;
+  penalty: number;
 }
 
 export interface SearchResult {
   status: 'answer' | 'suggestions' | 'fallback';
+  confidence: SearchConfidence;
   score: number;
   item?: KnowledgeItem;
+  items?: KnowledgeItem[];
   suggestions: KnowledgeItem[];
+  alternatives: KnowledgeItem[];
+  matchedFields: MatchedField[];
+  debugScore?: SearchScoreBreakdown;
+}
+
+export interface ConversationEvent {
+  id: string;
+  botId: string;
+  query: string;
+  status: SearchResult['status'];
+  confidence: SearchConfidence;
+  matchedKnowledgeIds: string[];
+  feedback?: 'helpful' | 'not-helpful';
+  createdAt: string;
 }
