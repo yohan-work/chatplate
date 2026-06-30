@@ -4,21 +4,13 @@ import { Avatar } from '../common/Avatar';
 
 interface SettingsViewProps {
   botConfig: BotConfig;
-  botId: string;
-  botOptions: Record<string, BotConfig>;
-  showDevBotSelector: boolean;
   unknownQuestions: string[];
-  onBotChange: (botId: string) => void;
   onReset: () => void;
 }
 
 export function SettingsView({
   botConfig,
-  botId,
-  botOptions,
-  showDevBotSelector,
   unknownQuestions,
-  onBotChange,
   onReset,
 }: SettingsViewProps) {
   return (
@@ -30,19 +22,6 @@ export function SettingsView({
           <p>{botConfig.bot.description}</p>
         </div>
       </section>
-
-      {showDevBotSelector ? (
-        <label className="field-label">
-          <span>샘플 bot data</span>
-          <select value={botId} onChange={(event) => onBotChange(event.target.value)}>
-            {Object.entries(botOptions).map(([id, config]) => (
-              <option key={id} value={id}>
-                {config.bot.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
 
       <section className="settings-list">
         <div className="settings-row">

@@ -1,35 +1,49 @@
-import { useState } from 'react';
-import { ChatbotLauncher } from '../components/widget/ChatbotLauncher';
-import { ChatbotWidget } from '../components/widget/ChatbotWidget';
+import { useEffect, useState } from 'react';
+import { AdminWorkspace } from '../components/admin/AdminWorkspace';
 import { botConfigs, defaultBotId } from '../data/bots';
+import type { BotConfig, BotConfigMap } from '../types/chatbot';
+import { cloneBotConfigs, loadStoredBotConfigs, saveStoredBotConfigs } from '../utils/botConfigStorage';
 
 export function App() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [botId, setBotId] = useState(defaultBotId);
-  const botConfig = botConfigs[botId];
-  const unreadCount = botConfig.notices.filter((notice) => notice.unread).length;
+  const [selectedBotId, setSelectedBotId] = useState(defaultBotId);
+  const [editableBotConfigs, setEditableBotConfigs] = useState<BotConfigMap>(() => loadStoredBotConfigs() ?? cloneBotConfigs(botConfigs));
+  const [unknownQuestionsByBotId, setUnknownQuestionsByBotId] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    saveStoredBotConfigs(editableBotConfigs);
+  }, [editableBotConfigs]);
+
+  const updateSelectedBotConfig = (updater: (config: BotConfig) => BotConfig) => {
+    setEditableBotConfigs((current) => ({
+      ...current,
+      [selectedBotId]: updater(current[selectedBotId]),
+    }));
+  };
+
+  const resetSelectedBot = () => {
+    setEditableBotConfigs((current) => ({
+      ...current,
+      [selectedBotId]: cloneBotConfigs({ [selectedBotId]: botConfigs[selectedBotId] })[selectedBotId],
+    }));
+    setUnknownQuestionsByBotId((current) => ({ ...current, [selectedBotId]: [] }));
+  };
+
+  const handleUnknownQuestion = (question: string) => {
+    setUnknownQuestionsByBotId((current) => ({
+      ...current,
+      [selectedBotId]: [...(current[selectedBotId] ?? []), question],
+    }));
+  };
 
   return (
-    <main className="demo-page">
-      <section className="demo-stage" aria-label="챗봇 위젯 데모">
-        <div>
-          <p className="demo-kicker">Embeddable support widget</p>
-          <h1>Chatplate</h1>
-          <p>
-            JSON knowledge 데이터를 교체해 여러 도메인의 고객 상담 위젯으로 사용할 수 있는 MVP입니다.
-          </p>
-        </div>
-      </section>
-
-      <ChatbotLauncher isOpen={isOpen} unreadCount={unreadCount} onToggle={() => setIsOpen((value) => !value)} />
-      <ChatbotWidget
-        botConfig={botConfig}
-        botId={botId}
-        isOpen={isOpen}
-        showDevBotSelector
-        onClose={() => setIsOpen(false)}
-        onBotChange={setBotId}
-      />
-    </main>
+    <AdminWorkspace
+      botConfigs={editableBotConfigs}
+      selectedBotId={selectedBotId}
+      unknownQuestions={unknownQuestionsByBotId[selectedBotId] ?? []}
+      onSelectBot={setSelectedBotId}
+      onUpdateBotConfig={updateSelectedBotConfig}
+      onResetBot={resetSelectedBot}
+      onUnknownQuestion={handleUnknownQuestion}
+    />
   );
 }

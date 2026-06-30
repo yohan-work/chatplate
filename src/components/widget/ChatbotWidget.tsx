@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Bot, RotateCcw, X } from 'lucide-react';
-import { botConfigs } from '../../data/bots';
 import { getFallbackSuggestions } from '../../engine/getFallbackSuggestions';
 import { findKnowledgeById, searchKnowledge } from '../../engine/searchKnowledge';
 import type { BotConfig, ChatMessage, KnowledgeItem, Notice, WidgetView } from '../../types/chatbot';
@@ -14,11 +13,9 @@ import { NoticeDetailView } from '../notice/NoticeDetailView';
 
 interface ChatbotWidgetProps {
   botConfig: BotConfig;
-  botId: string;
   isOpen: boolean;
-  showDevBotSelector?: boolean;
   onClose: () => void;
-  onBotChange: (botId: string) => void;
+  onUnknownQuestion?: (question: string) => void;
 }
 
 function createMessage(role: ChatMessage['role'], text: string, extra?: Partial<ChatMessage>): ChatMessage {
@@ -33,11 +30,9 @@ function createMessage(role: ChatMessage['role'], text: string, extra?: Partial<
 
 export function ChatbotWidget({
   botConfig,
-  botId,
   isOpen,
-  showDevBotSelector = false,
   onClose,
-  onBotChange,
+  onUnknownQuestion,
 }: ChatbotWidgetProps) {
   const [activeView, setActiveView] = useState<WidgetView>('home');
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
@@ -108,6 +103,7 @@ export function ChatbotWidget({
       nextMessages.push(createMessage('bot', '혹시 이 질문을 찾으셨나요?', { suggestions: result.suggestions }));
     } else {
       setUnknownQuestions((current) => [...current, query]);
+      onUnknownQuestion?.(query);
       nextMessages.push(
         createMessage('bot', botConfig.bot.fallbackMessage, { suggestions: getFallbackSuggestions(botConfig) }),
       );
@@ -175,11 +171,7 @@ export function ChatbotWidget({
         {activeView === 'settings' ? (
           <SettingsView
             botConfig={botConfig}
-            botId={botId}
-            botOptions={botConfigs}
-            showDevBotSelector={showDevBotSelector}
             unknownQuestions={unknownQuestions}
-            onBotChange={onBotChange}
             onReset={resetConversation}
           />
         ) : null}
