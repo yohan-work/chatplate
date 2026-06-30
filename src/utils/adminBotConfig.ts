@@ -1,4 +1,4 @@
-import type { BotConfig, KnowledgeItem, Notice, QuickReply } from '../types/chatbot';
+import type { BotConfig, KnowledgeItem, Notice, QuickReply, Ticket } from '../types/chatbot';
 
 export function createEmptyNotice(): Notice {
   const timestamp = Date.now();
@@ -57,4 +57,15 @@ export function parseCommaList(value: string): string[] {
 
 export function formatCommaList(values: string[]): string {
   return values.join(', ');
+}
+
+export function createKnowledgeFromTicket(ticket: Ticket, categoryId: string): KnowledgeItem {
+  return {
+    ...createEmptyKnowledge(categoryId),
+    question: ticket.originalQuestion || ticket.message,
+    aliases: ticket.originalQuestion && ticket.originalQuestion !== ticket.message ? [ticket.message] : [],
+    answer: '답변을 입력하세요.',
+    status: 'draft',
+    source: `ticket:${ticket.id}`,
+  };
 }

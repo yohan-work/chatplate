@@ -1,6 +1,6 @@
 export type WidgetView = 'home' | 'chat' | 'conversations' | 'settings' | 'notice';
 
-export type AdminPanelView = 'bot' | 'operation' | 'notices' | 'knowledge' | 'quickReplies' | 'quality' | 'data' | 'logs';
+export type AdminPanelView = 'bot' | 'operation' | 'notices' | 'knowledge' | 'quickReplies' | 'quality' | 'tickets' | 'data' | 'logs';
 
 export type ButtonType = 'url' | 'action' | 'tel' | 'mailto';
 
@@ -103,6 +103,8 @@ export interface ChatMessage {
   confidence?: SearchConfidence;
   matchedKnowledgeIds?: string[];
   feedback?: 'helpful' | 'not-helpful';
+  handoffCta?: boolean;
+  ticketId?: string;
 }
 
 export type SearchConfidence = 'high' | 'medium' | 'low';
@@ -141,4 +143,25 @@ export interface ConversationEvent {
   matchedKnowledgeIds: string[];
   feedback?: 'helpful' | 'not-helpful';
   createdAt: string;
+}
+
+export type TicketStatus = 'new' | 'inProgress' | 'resolved' | 'onHold';
+export type TicketPriority = 'low' | 'normal' | 'high';
+export type TicketSource = 'fallback' | 'negativeFeedback' | 'manualContact' | 'handoffRecommended';
+
+export interface Ticket {
+  id: string;
+  botId: string;
+  status: TicketStatus;
+  priority: TicketPriority;
+  source: TicketSource;
+  name: string;
+  contact: string;
+  message: string;
+  originalQuestion?: string;
+  matchedKnowledgeIds: string[];
+  conversationEventId?: string;
+  adminMemo: string;
+  createdAt: string;
+  updatedAt: string;
 }
