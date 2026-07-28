@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { KnowledgeItem, SearchResult } from '../types/chatbot';
-import { appendConversationEvent, createConversationEvent, loadConversationEvents, updateConversationEventFeedback } from './conversationEvents';
+import {
+  appendConversationEvent,
+  createConversationEvent,
+  createSmallTalkConversationEvent,
+  loadConversationEvents,
+  updateConversationEventFeedback,
+} from './conversationEvents';
 
 function createStorage() {
   const map = new Map<string, string>();
@@ -38,6 +44,23 @@ describe('conversationEvents', () => {
       scoreMargin: 0.42,
       matchedUtterance: '질문 변형',
       decisionReason: 'confident',
+    });
+  });
+
+  it('stores small-talk events separately from knowledge failures', () => {
+    const event = createSmallTalkConversationEvent('bot-1', {
+      kind: 'smalltalk',
+      originalQuery: '안녕하세요',
+      effectiveQuery: '안녕하세요',
+      smallTalkIntent: 'greeting',
+      replyText: '반갑습니다.',
+    });
+
+    expect(event).toMatchObject({
+      status: 'smalltalk',
+      interactionType: 'smalltalk',
+      smallTalkIntent: 'greeting',
+      matchedKnowledgeIds: [],
     });
   });
 });

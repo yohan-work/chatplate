@@ -1,4 +1,4 @@
-import type { ConversationEvent, SearchResult } from '../types/chatbot';
+import type { ConversationEvent, ConversationResolution, SearchResult } from '../types/chatbot';
 
 export const CONVERSATION_EVENTS_STORAGE_KEY = 'chatplate:conversation-events:v1';
 
@@ -13,7 +13,7 @@ function getBrowserStorage(): StorageLike | null {
   return window.localStorage;
 }
 
-export function createConversationEvent(botId: string, query: string, result: SearchResult): ConversationEvent {
+export function createConversationEvent(botId: string, query: string, result: SearchResult, effectiveQuery = query): ConversationEvent {
   const matchedItems = result.items ?? (result.item ? [result.item] : []);
   const candidateItems = [...matchedItems, ...result.suggestions, ...result.alternatives];
 
@@ -23,12 +23,31 @@ export function createConversationEvent(botId: string, query: string, result: Se
     query,
     status: result.status,
     confidence: result.confidence,
+    interactionType: result.status === 'fallback' ? 'fallback' : 'knowledge',
+    effectiveQuery,
     matchedKnowledgeIds: matchedItems.map((item) => item.id),
     candidateKnowledgeIds: [...new Set(candidateItems.map((item) => item.id))],
     topScore: result.score,
     scoreMargin: result.scoreMargin,
     matchedUtterance: result.matchedUtterance,
     decisionReason: result.decisionReason,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export function createSmallTalkConversationEvent(botId: string, resolution: ConversationResolution): ConversationEvent {
+  return {
+    id: `event-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    botId,
+    query: resolution.originalQuery,
+    status: 'smalltalk',
+    confidence: 'high',
+    interactionType: 'smalltalk',
+    effectiveQuery: resolution.effectiveQuery,
+    smallTalkIntent: resolution.smallTalkIntent,
+    matchedKnowledgeIds: [],
+    candidateKnowledgeIds: [],
+    decisionReason: undefined,
     createdAt: new Date().toISOString(),
   };
 }

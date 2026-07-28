@@ -1,6 +1,6 @@
 export type WidgetView = 'home' | 'chat' | 'conversations' | 'settings' | 'notice';
 
-export type AdminPanelView = 'bot' | 'operation' | 'notices' | 'knowledge' | 'quickReplies' | 'quality' | 'tickets' | 'data' | 'logs';
+export type AdminPanelView = 'bot' | 'operation' | 'notices' | 'knowledge' | 'quickReplies' | 'smallTalk' | 'quality' | 'tickets' | 'data' | 'logs';
 
 export type ButtonType = 'url' | 'action' | 'tel' | 'mailto';
 
@@ -97,6 +97,24 @@ export interface SearchConfig {
   clarificationFlows?: ClarificationFlow[];
 }
 
+export type SmallTalkIntentId = 'greeting' | 'thanks' | 'goodbye' | 'help' | 'identity' | 'human' | 'abuse' | 'noise';
+
+export interface SmallTalkRule {
+  id: string;
+  intentId: SmallTalkIntentId;
+  label: string;
+  enabled: boolean;
+  utterances: string[];
+  response: string;
+  handoffCta: boolean;
+  showSuggestions: boolean;
+}
+
+export interface SmallTalkConfig {
+  enabled: boolean;
+  rules: SmallTalkRule[];
+}
+
 export type UtterancePersona = 'parent' | 'student' | 'neutral';
 export type UtteranceVariation = 'formal' | 'colloquial' | 'short' | 'synonym' | 'word-order' | 'spacing' | 'typo' | 'contextual';
 export type AnswerMode = 'verified' | 'safe-general' | 'handoff';
@@ -138,6 +156,7 @@ export interface BotConfig {
   handoff?: HandoffConfig;
   customerJourneys?: CustomerJourney[];
   search?: SearchConfig;
+  smallTalk?: SmallTalkConfig;
   notices: Notice[];
   contactChannels: ContactChannel[];
   categories: Category[];
@@ -198,12 +217,26 @@ export interface SearchResult {
   decisionReason?: 'exact' | 'confident' | 'ambiguous' | 'low-similarity';
 }
 
+export interface ConversationResolution {
+  kind: 'knowledge' | 'smalltalk' | 'fallback';
+  originalQuery: string;
+  effectiveQuery: string;
+  searchResult?: SearchResult;
+  smallTalkIntent?: SmallTalkIntentId;
+  replyText?: string;
+  handoffCta?: boolean;
+  showSuggestions?: boolean;
+}
+
 export interface ConversationEvent {
   id: string;
   botId: string;
   query: string;
-  status: SearchResult['status'];
+  status: SearchResult['status'] | 'smalltalk';
   confidence: SearchConfidence;
+  interactionType?: ConversationResolution['kind'];
+  effectiveQuery?: string;
+  smallTalkIntent?: SmallTalkIntentId;
   matchedKnowledgeIds: string[];
   candidateKnowledgeIds?: string[];
   topScore?: number;

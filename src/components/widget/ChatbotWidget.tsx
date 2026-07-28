@@ -2,8 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Bot, RotateCcw, X } from 'lucide-react';
 import { getFallbackSuggestions } from '../../engine/getFallbackSuggestions';
+import { resolveConversation } from '../../engine/resolveConversation';
 import { findKnowledgeById, searchKnowledge } from '../../engine/searchKnowledge';
-import { appendConversationEvent, createConversationEvent, updateConversationEventFeedback } from '../../utils/conversationEvents';
+import {
+  appendConversationEvent,
+  createConversationEvent,
+  createSmallTalkConversationEvent,
+  updateConversationEventFeedback,
+} from '../../utils/conversationEvents';
 import type { BotConfig, ChatMessage, ClarificationOption, CustomerJourney, KnowledgeItem, Notice, SearchResult, Ticket, TicketSource, WidgetView } from '../../types/chatbot';
 import { BottomNavigation } from './BottomNavigation';
 import { HomeView } from '../home/HomeView';
@@ -147,9 +153,25 @@ export function ChatbotWidget({
   };
 
   const handleSubmit = (query: string) => {
-    const result = searchKnowledge(query, botConfig, { intentId: selectedIntentId });
+    const resolution = resolveConversation(query, botConfig, { intentId: selectedIntentId });
     const nextMessages: ChatMessage[] = [createMessage('user', query)];
-    const event = createConversationEvent(botConfig.bot.id, query, result);
+
+    if (resolution.kind === 'smalltalk') {
+      const event = createSmallTalkConversationEvent(botConfig.bot.id, resolution);
+      appendConversationEvent(event);
+      nextMessages.push(createMessage('bot', resolution.replyText ?? botConfig.bot.fallbackMessage, {
+        suggestions: resolution.showSuggestions ? getFallbackSuggestions(botConfig) : undefined,
+        confidence: 'high',
+        handoffCta: resolution.handoffCta,
+        id: event.id,
+      }));
+      setMessages((current) => [...current, ...nextMessages]);
+      setActiveView('chat');
+      return;
+    }
+
+    const result = resolution.searchResult ?? searchKnowledge(query, botConfig, { intentId: selectedIntentId });
+    const event = createConversationEvent(botConfig.bot.id, query, result, resolution.effectiveQuery);
     appendConversationEvent(event);
     onSearchResult?.(query, result);
 
