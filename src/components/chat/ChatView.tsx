@@ -1,7 +1,5 @@
-import { Clock } from 'lucide-react';
 import type { BotConfig, ChatMessage, ClarificationOption, KnowledgeItem, Ticket, TicketSource } from '../../types/chatbot';
 import { findKnowledgeById } from '../../engine/searchKnowledge';
-import { Avatar } from '../common/Avatar';
 import { ChatBubble } from './ChatBubble';
 import { ChatInput } from './ChatInput';
 import { ContactRequestForm } from './ContactRequestForm';
@@ -42,27 +40,6 @@ export function ChatView({
 }: ChatViewProps) {
   return (
     <div className="chat-view">
-      <div className="chat-header">
-        <Avatar name={botConfig.bot.name} src={botConfig.bot.avatarUrl} />
-        <div>
-          <strong>{botConfig.bot.name}</strong>
-          <span>
-            <Clock size={13} aria-hidden="true" /> {botConfig.operation.csHours}
-          </span>
-        </div>
-      </div>
-
-      <div className="quick-replies" aria-label="추천 질문">
-        {botConfig.quickReplies.map((reply) => {
-          const item = findKnowledgeById(botConfig, reply.knowledgeId);
-          return item ? (
-            <button key={reply.knowledgeId} type="button" onClick={() => onQuestionSelect(item)}>
-              {reply.label}
-            </button>
-          ) : null;
-        })}
-      </div>
-
       <div className="message-list" aria-live="polite">
         {messages.map((message) => (
           <ChatBubble
@@ -89,8 +66,21 @@ export function ChatView({
         ) : null}
       </div>
 
-      <p className="disclaimer">{botConfig.bot.disclaimer}</p>
+      {messages.length <= 1 ? (
+        <div className="quick-replies" aria-label="추천 질문">
+          {botConfig.quickReplies.slice(0, 3).map((reply) => {
+            const item = findKnowledgeById(botConfig, reply.knowledgeId);
+            return item ? (
+              <button key={reply.knowledgeId} type="button" onClick={() => onQuestionSelect(item)}>
+                {reply.label}
+              </button>
+            ) : null;
+          })}
+        </div>
+      ) : null}
+
       <ChatInput placeholder="궁금한 점을 입력해 주세요." onSubmit={onSubmit} />
+      <p className="disclaimer">{botConfig.bot.disclaimer}</p>
     </div>
   );
 }

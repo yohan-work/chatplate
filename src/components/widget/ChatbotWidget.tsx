@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { Bot, RotateCcw, X } from 'lucide-react';
+import { Bot, History, SquarePen, X } from 'lucide-react';
 import { getFallbackSuggestions } from '../../engine/getFallbackSuggestions';
 import { resolveConversation } from '../../engine/resolveConversation';
 import { findKnowledgeById, searchKnowledge } from '../../engine/searchKnowledge';
@@ -291,7 +291,7 @@ export function ChatbotWidget({
       aria-hidden={!isOpen}
     >
       <header className="widget-topbar">
-        <div className="widget-topbar__brand">
+        <button className="widget-topbar__brand" type="button" onClick={() => setActiveView('home')} aria-label="챗봇 홈으로 이동">
           <span className="bot-mark">
             <Bot size={19} aria-hidden="true" />
           </span>
@@ -299,9 +299,12 @@ export function ChatbotWidget({
             <strong>{botConfig.bot.name}</strong>
             <span>{botConfig.operation.botHours}</span>
           </div>
-        </div>
+        </button>
         <button className="icon-button" type="button" aria-label="대화 초기화" onClick={resetConversation}>
-          <RotateCcw size={18} aria-hidden="true" />
+          <SquarePen size={20} aria-hidden="true" />
+        </button>
+        <button className="icon-button" type="button" aria-label="대화 기록 보기" onClick={() => setActiveView('conversations')}>
+          <History size={21} aria-hidden="true" />
         </button>
         {variant === 'floating' ? (
           <button className="icon-button" type="button" aria-label="챗봇 닫기" onClick={onClose}>
@@ -364,7 +367,7 @@ export function ChatbotWidget({
         ) : null}
       </div>
 
-      <BottomNavigation activeView={activeView} onChange={setActiveView} />
+      {activeView === 'chat' ? null : <BottomNavigation activeView={activeView} onChange={setActiveView} />}
     </section>
   );
 }
