@@ -16,6 +16,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { searchKnowledge } from '../../engine/searchKnowledge';
+import { evaluateSearchDataset, type EvaluationMetrics } from '../../engine/evaluateSearchDataset';
 import { validateSmallTalkConfig } from '../../engine/resolveConversation';
 import { resolveSmallTalkConfig } from '../../data/smallTalkDefaults';
 import type {
@@ -596,6 +597,7 @@ function SearchQualityPanel({
 }) {
   const [query, setQuery] = useState(unknownQuestions[0] ?? '');
   const [eventVersion, setEventVersion] = useState(0);
+  const [evaluation, setEvaluation] = useState<EvaluationMetrics>();
   const result = useMemo(() => (query.trim() ? searchKnowledge(query, config) : null), [config, query]);
   const matchedItem = result?.item ?? result?.suggestions[0];
   const events = useMemo(
@@ -663,7 +665,28 @@ function SearchQualityPanel({
         >
           로그 초기화
         </button>
+        <button
+          className="admin-reset-button"
+          type="button"
+          onClick={() => setEvaluation(evaluateSearchDataset(config, 'test', 50))}
+        >
+          Holdout 50건 평가
+        </button>
       </div>
+
+      {evaluation ? (
+        <div className="quality-alternatives">
+          <strong>누수 없는 test 평가</strong>
+          <span>표본 {evaluation.samples} · top-1 {(evaluation.top1Accuracy * 100).toFixed(1)}%</span>
+          <span>top-3 {(evaluation.top3Recall * 100).toFixed(1)}% · MRR {evaluation.meanReciprocalRank.toFixed(3)}</span>
+          <span>fallback {(evaluation.fallbackRate * 100).toFixed(1)}%</span>
+          {evaluation.failures.slice(0, 3).map((failure) => (
+            <span key={`${failure.expectedId}:${failure.query}`}>
+              실패: “{failure.query}” → 기대 {failure.expectedId}, 후보 {failure.rankedIds.join(', ') || '없음'}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       <TextField label="테스트 질문" value={query} onChange={setQuery} placeholder="예: 설치랑 요금 알려줘" />
 

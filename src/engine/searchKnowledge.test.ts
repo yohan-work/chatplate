@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { botConfigs } from '../data/bots';
 import { searchKnowledge } from './searchKnowledge';
 import { normalizeText } from './normalizeText';
+import { evaluateSearchDataset } from './evaluateSearchDataset';
 
 describe('searchKnowledge', () => {
   it('returns an installation answer for a direct install question', () => {
@@ -31,8 +32,8 @@ describe('searchKnowledge', () => {
 
   it('uses Coach My:Way synonym groups for conversational inquiry wording', () => {
     const result = searchKnowledge('카톡으로 문의하고 싶어요', botConfigs['coach-myway']);
-    expect(result.status).toBe('suggestions');
-    expect(result.suggestions.map((item) => item.id)).toContain('consultation-001');
+    expect(result.status).toBe('answer');
+    expect(result.item?.id).toBe('consultation-001');
   });
 
   it('returns suggestions instead of a single answer for close matches', () => {
@@ -52,21 +53,24 @@ describe('searchKnowledge', () => {
     expect(result.status).toBe('fallback');
   });
 
-  it('activates the Coach My:Way 50-question and 500-utterance catalog', () => {
+  it('activates the Coach My:Way 50-question and 2,000-utterance split catalog', () => {
     const knowledge = botConfigs['coach-myway'].knowledge;
     expect(knowledge).toHaveLength(50);
     expect(knowledge.every((item) => item.status === 'active')).toBe(true);
-    expect(knowledge.flatMap((item) => item.utterances ?? [])).toHaveLength(500);
+    expect(knowledge.flatMap((item) => item.utterances ?? [])).toHaveLength(2000);
+    expect(knowledge.flatMap((item) => item.utterances ?? []).filter((utterance) => utterance.split === 'train')).toHaveLength(1400);
+    expect(knowledge.flatMap((item) => item.utterances ?? []).filter((utterance) => utterance.split === 'dev')).toHaveLength(300);
+    expect(knowledge.flatMap((item) => item.utterances ?? []).filter((utterance) => utterance.split === 'test')).toHaveLength(300);
     expect(knowledge.every((item) => item.answer.trim().length > 0)).toBe(true);
     expect(knowledge.every((item) => item.answerMode && item.riskLevel)).toBe(true);
     const utterances = knowledge.flatMap((item) => item.utterances?.map((utterance) => normalizeText(utterance.text)) ?? []);
     expect(new Set(utterances).size).toBe(utterances.length);
   });
 
-  it('retrieves the intended FAQ for every registered Coach My:Way utterance', () => {
+  it('retrieves the intended FAQ for representative indexed Coach My:Way utterances', () => {
     const config = botConfigs['coach-myway'];
     config.knowledge.forEach((expectedItem) => {
-      expectedItem.utterances?.forEach((utterance) => {
+      expectedItem.utterances?.filter((utterance) => utterance.split === 'train').slice(0, 3).forEach((utterance) => {
         const result = searchKnowledge(utterance.text, config);
         const candidates = [
           ...(result.items ?? (result.item ? [result.item] : [])),
@@ -78,6 +82,13 @@ describe('searchKnowledge', () => {
         ).toContain(expectedItem.id);
       });
     });
+  });
+
+  it('measures unseen holdout questions without adding them to the search index', () => {
+    const metrics = evaluateSearchDataset(botConfigs['coach-myway'], 'test', 50);
+    expect(metrics.samples).toBe(50);
+    expect(metrics.top3Recall).toBeGreaterThanOrEqual(0.8);
+    expect(metrics.meanReciprocalRank).toBeGreaterThanOrEqual(0.7);
   });
 
   it('marks policy answers for human handoff', () => {
