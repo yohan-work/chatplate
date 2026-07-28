@@ -124,6 +124,18 @@ export interface SearchUtterance {
   text: string;
   persona: UtterancePersona;
   variation: UtteranceVariation;
+  split?: 'train' | 'dev' | 'test';
+  source?: 'seed' | 'representative' | 'production';
+  approved?: boolean;
+  contextRequired?: boolean;
+  negativeFor?: string[];
+  entities?: Record<string, string>;
+}
+
+export interface AnswerBlock {
+  id: string;
+  text: string;
+  condition?: string;
 }
 
 export interface KnowledgeItem {
@@ -140,6 +152,10 @@ export interface KnowledgeItem {
   tags?: string[];
   negativeKeywords?: string[];
   answer: string;
+  shortAnswer?: string;
+  answerBlocks?: AnswerBlock[];
+  answerVariants?: string[];
+  followUpPrompts?: string[];
   buttons: AnswerButton[];
   relatedIds: string[];
   priority: number;
@@ -184,7 +200,7 @@ export interface ChatMessage {
 
 export type SearchConfidence = 'high' | 'medium' | 'low';
 
-export type MatchedField = 'question' | 'alias' | 'keyword' | 'tag' | 'synonym' | 'intent' | 'bm25' | 'ngram' | 'token';
+export type MatchedField = 'question' | 'alias' | 'keyword' | 'tag' | 'synonym' | 'intent' | 'bm25' | 'ngram' | 'token' | 'entity' | 'jamo' | 'rrf';
 
 export interface SearchScoreBreakdown {
   exact: number;
@@ -200,6 +216,38 @@ export interface SearchScoreBreakdown {
   bm25: number;
   ngram: number;
   jaccard: number;
+  entity: number;
+  jamo: number;
+  rrf: number;
+  routeCount: number;
+}
+
+export type QueryType = 'price' | 'method' | 'availability' | 'schedule' | 'policy' | 'comparison' | 'identity' | 'general';
+
+export interface QueryFeatures {
+  normalized: string;
+  stems: string[];
+  jamoText: string;
+  entities: Record<string, string>;
+  queryType: QueryType;
+  negative: boolean;
+  followUp: boolean;
+}
+
+export interface ConversationContext {
+  lastIntentId?: string;
+  lastKnowledgeIds: string[];
+  entities: Record<string, string>;
+  pendingCandidateIds: string[];
+  turnCount: number;
+  updatedAt: number;
+}
+
+export interface ResponsePlan {
+  text: string;
+  knowledgeIds: string[];
+  toneVariant: number;
+  followUpPrompts: string[];
 }
 
 export interface SearchResult {
@@ -226,6 +274,8 @@ export interface ConversationResolution {
   replyText?: string;
   handoffCta?: boolean;
   showSuggestions?: boolean;
+  responsePlan?: ResponsePlan;
+  contextPatch?: ConversationContext;
 }
 
 export interface ConversationEvent {

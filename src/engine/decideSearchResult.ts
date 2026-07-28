@@ -4,9 +4,15 @@ import type { RankedKnowledge } from './rankKnowledge';
 export const HIGH_CONFIDENCE_THRESHOLD = 0.75;
 export const MEDIUM_CONFIDENCE_THRESHOLD = 0.38;
 
-function confidenceFor(score: number): SearchConfidence {
-  if (score >= HIGH_CONFIDENCE_THRESHOLD) return 'high';
-  if (score >= MEDIUM_CONFIDENCE_THRESHOLD) return 'medium';
+function thresholdsFor(ranked: RankedKnowledge): { high: number; medium: number } {
+  if (ranked.entry.item.riskLevel === 'policy') return { high: 0.86, medium: 0.56 };
+  if (ranked.entry.item.riskLevel === 'personal') return { high: 0.8, medium: 0.48 };
+  return { high: 0.72, medium: 0.36 };
+}
+
+function confidenceFor(score: number, thresholds: { high: number; medium: number }): SearchConfidence {
+  if (score >= thresholds.high) return 'high';
+  if (score >= thresholds.medium) return 'medium';
   return 'low';
 }
 
@@ -27,14 +33,21 @@ export function decideSearchResult(ranked: RankedKnowledge[]): SearchResult {
     };
   }
 
-  const confidence = confidenceFor(top.score);
+  const thresholds = thresholdsFor(top);
+  const confidence = confidenceFor(top.score, thresholds);
   const suggestions = ranked
-    .filter((entry) => entry.score >= MEDIUM_CONFIDENCE_THRESHOLD)
+    .filter((entry) => entry.score >= thresholdsFor(entry).medium)
     .slice(0, 3)
     .map((entry) => entry.entry.item);
 
   const isExact = top.debugScore.exact === 1;
-  const isAmbiguous = Boolean(second && top.score >= MEDIUM_CONFIDENCE_THRESHOLD && second.score >= MEDIUM_CONFIDENCE_THRESHOLD && scoreMargin < 0.08);
+  const isAmbiguous = Boolean(
+    second &&
+    top.score >= thresholds.medium &&
+    second.score >= thresholdsFor(second).medium &&
+    scoreMargin < 0.08 &&
+    (!isExact || second.debugScore.exact === 1),
+  );
 
   if (isAmbiguous) {
     return {

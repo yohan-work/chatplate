@@ -1,5 +1,6 @@
 import type { BotConfig, KnowledgeItem } from '../types/chatbot';
 import { normalizeText } from './normalizeText';
+import { toJamo } from './queryFeatures';
 import { ngrams, tokenize } from './textSimilarity';
 
 export interface SearchIndexEntry {
@@ -10,6 +11,7 @@ export interface SearchIndexEntry {
   aliasesCompact: string[];
   utterances: string[];
   utteranceNgrams: Map<string, number>[];
+  utteranceJamoNgrams: Map<string, number>[];
   keywords: string[];
   tags: string[];
   negativeKeywords: string[];
@@ -31,7 +33,9 @@ export function buildSearchIndex(botConfig: BotConfig): SearchIndexEntry[] {
     .map((item) => {
       const question = normalizeText(item.question);
       const aliases = item.aliases.map(normalizeText);
-      const utterances = (item.utterances ?? []).map((utterance) => normalizeText(utterance.text));
+      const utterances = (item.utterances ?? [])
+        .filter((utterance) => !utterance.split || utterance.split === 'train')
+        .map((utterance) => normalizeText(utterance.text));
       const keywords = item.keywords.map(normalizeText);
       const tags = (item.tags ?? []).map(normalizeText);
       const negativeKeywords = (item.negativeKeywords ?? []).map(normalizeText);
@@ -46,6 +50,7 @@ export function buildSearchIndex(botConfig: BotConfig): SearchIndexEntry[] {
         aliasesCompact: aliases.map((alias) => alias.replace(/\s/g, '')),
         utterances,
         utteranceNgrams: [question, ...aliases, ...utterances].map(ngrams),
+        utteranceJamoNgrams: [question, ...aliases, ...utterances].map((value) => ngrams(toJamo(value))),
         keywords,
         tags,
         negativeKeywords,

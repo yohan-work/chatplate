@@ -2,6 +2,7 @@ import type { KnowledgeItem } from '../types/chatbot';
 import { analyzeQuery } from './analyzeQuery';
 import type { SearchIndexEntry } from './buildSearchIndex';
 import { normalizeText } from './normalizeText';
+import { toJamo } from './queryFeatures';
 import { rankKnowledge } from './rankKnowledge';
 import { ngrams, tokenize } from './textSimilarity';
 
@@ -14,6 +15,8 @@ export function scoreKnowledge(query: string, item: KnowledgeItem): number {
     aliasesCompact: item.aliases.map((alias) => normalizeText(alias).replace(/\s/g, '')),
     utterances: (item.utterances ?? []).map((utterance) => normalizeText(utterance.text)),
     utteranceNgrams: [item.question, ...item.aliases, ...(item.utterances ?? []).map((utterance) => utterance.text)].map(ngrams),
+    utteranceJamoNgrams: [item.question, ...item.aliases, ...(item.utterances ?? []).map((utterance) => utterance.text)]
+      .map((value) => ngrams(toJamo(value))),
     keywords: item.keywords.map(normalizeText),
     tags: (item.tags ?? []).map(normalizeText),
     negativeKeywords: (item.negativeKeywords ?? []).map(normalizeText),
