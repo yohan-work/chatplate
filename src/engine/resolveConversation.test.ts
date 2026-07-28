@@ -57,11 +57,14 @@ describe('resolveConversation', () => {
     expect(result.searchResult?.status).toBe('fallback');
   });
 
-  it('rewrites an elliptical follow-up using the previous resolved FAQ', () => {
+  it('clarifies an elliptical follow-up when standalone and contextual candidates differ', () => {
     const first = resolveConversation('우리 아이에게 맞는지 궁금해요', coach);
     const followUp = resolveConversation('그건 어떻게 진행돼요?', coach, { context: first.contextPatch });
-    expect(followUp.effectiveQuery).toContain('우리 아이에게 맞을지 궁금해요');
-    expect(followUp.responsePlan?.text).toContain('앞선 문의와 이어서');
+    expect(followUp.effectiveQuery).toBe('그건 어떻게 진행돼요?');
+    expect(followUp.routeDecision?.mode).toBe('clarification');
+    expect(followUp.searchResult?.suggestions.map((item) => item.id)).toEqual(['consultation-004', 'program-001']);
+    expect(followUp.clarificationPrompt).toContain('확인해 주세요');
+    expect(followUp.responsePlan).toBeUndefined();
     expect(followUp.contextPatch?.turnCount).toBe(2);
   });
 
@@ -72,10 +75,11 @@ describe('resolveConversation', () => {
       ...(followUp.searchResult?.items ?? (followUp.searchResult?.item ? [followUp.searchResult.item] : [])),
       ...(followUp.searchResult?.suggestions ?? []),
     ];
-    expect(followUp.effectiveQuery).toContain('중학생');
     expect(candidates.some((item) => item.intentId === 'pricing')).toBe(true);
     expect(followUp.effectiveQuery).not.toContain('중학생도 코칭이 가능한가요');
-    expect(followUp.responsePlan?.text ?? '').not.toContain('앞선 문의와 이어서');
+    expect(followUp.routeDecision?.mode).toBe('clarification');
+    expect(followUp.contextPatch?.entities.grade).toBe('중학생');
+    expect(followUp.responsePlan).toBeUndefined();
   });
 
   it('treats a short location question as a new topic instead of repeating the previous answer', () => {

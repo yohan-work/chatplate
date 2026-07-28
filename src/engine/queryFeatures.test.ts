@@ -13,6 +13,7 @@ describe('queryFeatures', () => {
     const features = extractQueryFeatures('그럼 온라인 말고 방문은요?');
     expect(features.negative).toBe(true);
     expect(features.followUp).toBe(true);
+    expect(features.referenceStrength).toBe('weak');
     expect(features.entities.mode).toBe('온라인');
   });
 
@@ -24,6 +25,13 @@ describe('queryFeatures', () => {
   it('recognizes a short location question as an explicit topic', () => {
     const features = extractQueryFeatures('위치가 어디?');
     expect(features.queryType).toBe('location');
+    expect(features.isShort).toBe(true);
+    expect(features.referenceStrength).toBe('none');
     expect(features.followUp).toBe(true);
+  });
+
+  it('separates a strong reference from a merely short question', () => {
+    expect(extractQueryFeatures('그건 어떻게 진행돼요?').referenceStrength).toBe('strong');
+    expect(extractQueryFeatures('과목은 뭐가 있어?').referenceStrength).toBe('none');
   });
 });

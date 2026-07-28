@@ -231,6 +231,8 @@ export interface QueryFeatures {
   entities: Record<string, string>;
   queryType: QueryType;
   negative: boolean;
+  isShort: boolean;
+  referenceStrength: 'none' | 'weak' | 'strong';
   followUp: boolean;
 }
 
@@ -248,6 +250,25 @@ export interface ResponsePlan {
   knowledgeIds: string[];
   toneVariant: number;
   followUpPrompts: string[];
+}
+
+export type ConversationRouteMode = 'standalone' | 'contextual' | 'clarification' | 'fallback';
+
+export interface ConversationRouteDecision {
+  mode: ConversationRouteMode;
+  reason:
+    | 'no-context'
+    | 'same-candidate'
+    | 'standalone-exact'
+    | 'single-usable'
+    | 'score-gap'
+    | 'close-candidates'
+    | 'reference-without-evidence'
+    | 'both-low';
+  standaloneKnowledgeId?: string;
+  contextualKnowledgeId?: string;
+  standaloneScore: number;
+  contextualScore?: number;
 }
 
 export interface SearchResult {
@@ -276,6 +297,8 @@ export interface ConversationResolution {
   showSuggestions?: boolean;
   responsePlan?: ResponsePlan;
   contextPatch?: ConversationContext;
+  routeDecision?: ConversationRouteDecision;
+  clarificationPrompt?: string;
 }
 
 export interface ConversationEvent {

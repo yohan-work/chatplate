@@ -3,7 +3,6 @@ import type {
   BotConfig,
   ConversationContext,
   ConversationResolution,
-  QueryType,
   SmallTalkConfig,
   SmallTalkIntentId,
   SmallTalkRule,
@@ -11,21 +10,16 @@ import type {
 import { composeResponsePlan } from './composeResponsePlan';
 import { normalizeText } from './normalizeText';
 import { extractQueryFeatures } from './queryFeatures';
-import { findKnowledgeById, searchKnowledge } from './searchKnowledge';
+import { routeConversationQuery } from './routeConversationQuery';
+import { searchKnowledge } from './searchKnowledge';
 
 const MAX_INPUT_LENGTH = 300;
 const REPEATED_CHARACTER = /^(.)\1{3,}$/u;
 const WRAPPER_INTENTS = new Set<SmallTalkIntentId>(['greeting', 'thanks', 'goodbye']);
 const CONTAINS_INTENTS = new Set<SmallTalkIntentId>(['human', 'abuse']);
-const INDEPENDENT_QUERY_TYPES = new Set<QueryType>(['price', 'policy', 'schedule', 'location', 'identity']);
 
 interface NormalizedRule extends SmallTalkRule {
   normalizedUtterances: string[];
-}
-
-interface RewrittenQuery {
-  query: string;
-  continued: boolean;
 }
 
 const ruleCache = new WeakMap<SmallTalkConfig, NormalizedRule[]>();
@@ -93,34 +87,24 @@ function smallTalkResolution(originalQuery: string, effectiveQuery: string, rule
   };
 }
 
-function rewriteFollowUpQuery(query: string, botConfig: BotConfig, context?: ConversationContext): RewrittenQuery {
-  if (!context || Date.now() - context.updatedAt > 10 * 60 * 1000) return { query, continued: false };
-  const features = extractQueryFeatures(query);
-  if (!features.followUp) return { query, continued: false };
-
-  const contextEntities = Object.values(context.entities).filter((value) => !query.includes(value));
-  const hasExplicitTopic = INDEPENDENT_QUERY_TYPES.has(features.queryType) ||
-    /(상담|등록|온라인|비대면|화상|방문|오프라인|대면)/u.test(query);
-  if (hasExplicitTopic) {
-    return {
-      query: [query, ...contextEntities].join(' ').trim(),
-      continued: false,
-    };
-  }
-
-  const previous = context.lastKnowledgeIds.map((id) => findKnowledgeById(botConfig, id)).find(Boolean);
-  return previous
-    ? { query: `${previous.question} ${query}`, continued: true }
-    : { query: [query, ...contextEntities].join(' ').trim(), continued: false };
-}
-
 function contextPatch(
   query: string,
   result: ReturnType<typeof searchKnowledge>,
   previous?: ConversationContext,
+  clarification = false,
 ): ConversationContext {
-  const items = result.items ?? (result.item ? [result.item] : result.suggestions.slice(0, 1));
   const features = extractQueryFeatures(query);
+  if (clarification && previous) {
+    return {
+      ...previous,
+      entities: { ...previous.entities, ...features.entities },
+      pendingCandidateIds: result.suggestions.map((item) => item.id),
+      turnCount: previous.turnCount + 1,
+      updatedAt: Date.now(),
+    };
+  }
+
+  const items = result.items ?? (result.item ? [result.item] : result.suggestions.slice(0, 1));
   return {
     lastIntentId: items[0]?.intentId ?? previous?.lastIntentId,
     lastKnowledgeIds: items.map((item) => item.id),
@@ -138,15 +122,19 @@ function knowledgeResolution(
   intentId?: string,
   context?: ConversationContext,
 ): ConversationResolution {
-  const rewritten = rewriteFollowUpQuery(effectiveQuery, botConfig, context);
-  const searchResult = searchKnowledge(rewritten.query, botConfig, { intentId });
+  const route = routeConversationQuery(effectiveQuery, botConfig, { intentId, context });
+  const searchResult = route.result;
   return {
     kind: searchResult.status === 'fallback' ? 'fallback' : 'knowledge',
     originalQuery,
-    effectiveQuery: rewritten.query,
+    effectiveQuery: route.effectiveQuery,
     searchResult,
-    responsePlan: composeResponsePlan(effectiveQuery, searchResult, context, { continued: rewritten.continued }),
-    contextPatch: contextPatch(effectiveQuery, searchResult, context),
+    responsePlan: route.decision.mode === 'clarification'
+      ? undefined
+      : composeResponsePlan(effectiveQuery, searchResult, context, { continued: route.continued }),
+    contextPatch: contextPatch(effectiveQuery, searchResult, context, route.decision.mode === 'clarification'),
+    routeDecision: route.decision,
+    clarificationPrompt: route.clarificationPrompt,
   };
 }
 

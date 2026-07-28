@@ -2,7 +2,8 @@ import type { QueryFeatures, QueryType } from '../types/chatbot';
 import { normalizeText } from './normalizeText';
 
 const ENDINGS = /(?:에서는|에게는|으로는|부터는|까지는|이라면|라면|인가요|할까요|해요|돼요|되나요|있나요|없나요|나요|가요|에서|에게|으로|부터|까지|처럼|보다|은|는|이|가|을|를|에|도|만|요)$/u;
-const FOLLOW_UP = /^(?:그럼|그러면|그건|그거|그렇다면|그중|그때|또|그리고)|(?:은요|는요|도요)$/u;
+const STRONG_REFERENCE = /^(?:그건|그거|그중|그때|그렇게|그 부분|그 내용)(?:\s|$)/u;
+const WEAK_REFERENCE = /^(?:그럼|그러면|그렇다면|또|그리고)(?:\s|$)|(?:은요|는요|도요)$/u;
 const NEGATIVE = /(?:안\s|못\s|아니|없|말고|제외|불가|싫|어렵)/u;
 
 const ENTITY_PATTERNS: Array<[string, RegExp]> = [
@@ -42,19 +43,29 @@ export function toJamo(value: string): string {
 
 export function extractQueryFeatures(value: string): QueryFeatures {
   const normalized = normalizeText(value);
+  const tokens = normalized.split(' ').filter(Boolean);
   const entities: Record<string, string> = {};
   ENTITY_PATTERNS.forEach(([key, pattern]) => {
     const match = normalized.match(pattern);
     if (match) entities[key] = match[1];
   });
 
+  const referenceStrength = STRONG_REFERENCE.test(normalized)
+    ? 'strong'
+    : WEAK_REFERENCE.test(normalized)
+      ? 'weak'
+      : 'none';
+  const isShort = tokens.length <= 2;
+
   return {
     normalized,
-    stems: normalized.split(' ').map(stem).filter((token) => token.length >= 2),
+    stems: tokens.map(stem).filter((token) => token.length >= 2),
     jamoText: toJamo(normalized),
     entities,
     queryType: detectQueryType(normalized),
     negative: NEGATIVE.test(normalized),
-    followUp: FOLLOW_UP.test(normalized) || normalized.split(' ').length <= 2,
+    isShort,
+    referenceStrength,
+    followUp: referenceStrength !== 'none' || isShort,
   };
 }
