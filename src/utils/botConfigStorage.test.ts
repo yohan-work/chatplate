@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { botConfigs } from '../data/bots';
 import { removeKnowledgeItem } from './adminBotConfig';
-import { loadStoredBotConfigs, resetStoredBotConfigs, saveStoredBotConfigs } from './botConfigStorage';
+import { cloneBotConfigs, loadStoredBotConfigs, resetStoredBotConfigs, saveStoredBotConfigs } from './botConfigStorage';
 
 function createStorage() {
   const map = new Map<string, string>();
@@ -19,6 +19,19 @@ describe('botConfigStorage', () => {
     expect(loadStoredBotConfigs(storage)?.['alf-demo'].bot.name).toBe('ALF');
     resetStoredBotConfigs(storage);
     expect(loadStoredBotConfigs(storage)).toBeNull();
+  });
+
+  it('merges a newly bundled bot with saved browser configs', () => {
+    const storage = createStorage();
+    saveStoredBotConfigs({ 'alf-demo': botConfigs['alf-demo'] }, storage);
+
+    const merged = {
+      ...cloneBotConfigs(botConfigs),
+      ...(loadStoredBotConfigs(storage) ?? {}),
+    };
+
+    expect(merged['coach-myway']).toEqual(botConfigs['coach-myway']);
+    expect(merged['alf-demo']).toEqual(botConfigs['alf-demo']);
   });
 });
 

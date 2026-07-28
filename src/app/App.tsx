@@ -6,7 +6,10 @@ import { cloneBotConfigs, loadStoredBotConfigs, saveStoredBotConfigs } from '../
 
 export function App() {
   const [selectedBotId, setSelectedBotId] = useState(defaultBotId);
-  const [editableBotConfigs, setEditableBotConfigs] = useState<BotConfigMap>(() => loadStoredBotConfigs() ?? cloneBotConfigs(botConfigs));
+  const [editableBotConfigs, setEditableBotConfigs] = useState<BotConfigMap>(() => ({
+    ...cloneBotConfigs(botConfigs),
+    ...(loadStoredBotConfigs() ?? {}),
+  }));
   const [unknownQuestionsByBotId, setUnknownQuestionsByBotId] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
