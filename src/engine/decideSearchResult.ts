@@ -1,8 +1,8 @@
 import type { KnowledgeItem, SearchConfidence, SearchResult } from '../types/chatbot';
 import type { RankedKnowledge } from './rankKnowledge';
 
-export const HIGH_CONFIDENCE_THRESHOLD = 58;
-export const MEDIUM_CONFIDENCE_THRESHOLD = 28;
+export const HIGH_CONFIDENCE_THRESHOLD = 0.75;
+export const MEDIUM_CONFIDENCE_THRESHOLD = 0.38;
 
 function confidenceFor(score: number): SearchConfidence {
   if (score >= HIGH_CONFIDENCE_THRESHOLD) return 'high';
@@ -13,6 +13,7 @@ function confidenceFor(score: number): SearchConfidence {
 export function decideSearchResult(ranked: RankedKnowledge[]): SearchResult {
   const top = ranked[0];
   const second = ranked[1];
+  const scoreMargin = top && second ? top.score - second.score : top?.score ?? 0;
   const alternatives = ranked.slice(1, 4).map((entry) => entry.entry.item);
 
   if (!top) {
@@ -32,7 +33,8 @@ export function decideSearchResult(ranked: RankedKnowledge[]): SearchResult {
     .slice(0, 3)
     .map((entry) => entry.entry.item);
 
-  const isAmbiguous = Boolean(second && top.score >= MEDIUM_CONFIDENCE_THRESHOLD && second.score >= MEDIUM_CONFIDENCE_THRESHOLD && top.score - second.score < 12);
+  const isExact = top.debugScore.exact === 1;
+  const isAmbiguous = Boolean(second && top.score >= MEDIUM_CONFIDENCE_THRESHOLD && second.score >= MEDIUM_CONFIDENCE_THRESHOLD && scoreMargin < 0.08);
 
   if (isAmbiguous) {
     return {
@@ -43,10 +45,13 @@ export function decideSearchResult(ranked: RankedKnowledge[]): SearchResult {
       alternatives,
       matchedFields: top.matchedFields,
       debugScore: top.debugScore,
+      matchedUtterance: top.matchedUtterance,
+      scoreMargin,
+      decisionReason: 'ambiguous',
     };
   }
 
-  if (confidence === 'high') {
+  if (confidence === 'high' || isExact) {
     return {
       status: 'answer',
       confidence,
@@ -57,6 +62,9 @@ export function decideSearchResult(ranked: RankedKnowledge[]): SearchResult {
       alternatives,
       matchedFields: top.matchedFields,
       debugScore: top.debugScore,
+      matchedUtterance: top.matchedUtterance,
+      scoreMargin,
+      decisionReason: isExact ? 'exact' : 'confident',
     };
   }
 
@@ -71,6 +79,9 @@ export function decideSearchResult(ranked: RankedKnowledge[]): SearchResult {
       alternatives,
       matchedFields: top.matchedFields,
       debugScore: top.debugScore,
+      matchedUtterance: top.matchedUtterance,
+      scoreMargin,
+      decisionReason: 'confident',
     };
   }
 
@@ -82,6 +93,9 @@ export function decideSearchResult(ranked: RankedKnowledge[]): SearchResult {
     alternatives: [],
     matchedFields: top.matchedFields,
     debugScore: top.debugScore,
+    matchedUtterance: top.matchedUtterance,
+    scoreMargin,
+    decisionReason: 'low-similarity',
   };
 }
 

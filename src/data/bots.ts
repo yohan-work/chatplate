@@ -3,6 +3,7 @@ import animalHospital from './animal-hospital.json';
 import cafe from './cafe.json';
 import coachMyway from './coach-myway.json';
 import { coachMywayDraftKnowledge } from './coach-myway-drafts';
+import { enrichCoachMywayDataset } from './coach-myway-utterances';
 import lawOffice from './law-office.json';
 import type { BotConfig } from '../types/chatbot';
 
@@ -13,7 +14,7 @@ export const botConfigs: Record<string, BotConfig> = {
   cafe: cafe as BotConfig,
   'coach-myway': {
     ...(coachMyway as BotConfig),
-    knowledge: [...(coachMyway as BotConfig).knowledge, ...coachMywayDraftKnowledge],
+    knowledge: enrichCoachMywayDataset([...(coachMyway as BotConfig).knowledge, ...coachMywayDraftKnowledge]),
   },
 };
 

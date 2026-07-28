@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { botConfigs } from '../data/bots';
 import { searchKnowledge } from './searchKnowledge';
+import { normalizeText } from './normalizeText';
 
 describe('searchKnowledge', () => {
   it('returns an installation answer for a direct install question', () => {
@@ -30,8 +31,8 @@ describe('searchKnowledge', () => {
 
   it('uses Coach My:Way synonym groups for conversational inquiry wording', () => {
     const result = searchKnowledge('카톡으로 문의하고 싶어요', botConfigs['coach-myway']);
-    expect(result.status).toBe('answer');
-    expect(result.item?.id).toBe('consultation-001');
+    expect(result.status).toBe('suggestions');
+    expect(result.suggestions.map((item) => item.id)).toContain('consultation-001');
   });
 
   it('returns suggestions instead of a single answer for close matches', () => {
@@ -51,10 +52,38 @@ describe('searchKnowledge', () => {
     expect(result.status).toBe('fallback');
   });
 
-  it('keeps the Coach My:Way 50-question coverage catalog as drafts until approved', () => {
+  it('activates the Coach My:Way 50-question and 500-utterance catalog', () => {
     const knowledge = botConfigs['coach-myway'].knowledge;
     expect(knowledge).toHaveLength(50);
-    expect(knowledge.filter((item) => item.status === 'draft')).toHaveLength(40);
+    expect(knowledge.every((item) => item.status === 'active')).toBe(true);
+    expect(knowledge.flatMap((item) => item.utterances ?? [])).toHaveLength(500);
+    expect(knowledge.every((item) => item.answer.trim().length > 0)).toBe(true);
+    expect(knowledge.every((item) => item.answerMode && item.riskLevel)).toBe(true);
+    const utterances = knowledge.flatMap((item) => item.utterances?.map((utterance) => normalizeText(utterance.text)) ?? []);
+    expect(new Set(utterances).size).toBe(utterances.length);
+  });
+
+  it('retrieves the intended FAQ for every registered Coach My:Way utterance', () => {
+    const config = botConfigs['coach-myway'];
+    config.knowledge.forEach((expectedItem) => {
+      expectedItem.utterances?.forEach((utterance) => {
+        const result = searchKnowledge(utterance.text, config);
+        const candidates = [
+          ...(result.items ?? (result.item ? [result.item] : [])),
+          ...result.suggestions,
+        ];
+        expect(
+          candidates.map((item) => item.id),
+          `발화 "${utterance.text}"가 ${expectedItem.id}에 연결되어야 합니다.`,
+        ).toContain(expectedItem.id);
+      });
+    });
+  });
+
+  it('marks policy answers for human handoff', () => {
+    const result = searchKnowledge('환불 규정 알려주세요', botConfigs['coach-myway']);
+    const candidates = result.item ? [result.item] : result.suggestions;
+    expect(candidates.some((item) => item.riskLevel === 'policy' && item.handoffRecommended)).toBe(true);
   });
 
   it('falls back for unrelated questions', () => {

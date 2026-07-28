@@ -1,16 +1,21 @@
 import type { MatchedField, SearchScoreBreakdown } from '../types/chatbot';
 import type { QueryAnalysis } from './analyzeQuery';
 import type { SearchIndexEntry } from './buildSearchIndex';
+import { bm25Scores, cosineSimilarity, jaccardSimilarity, ngrams, tokenize } from './textSimilarity';
 
 export interface RankedKnowledge {
   entry: SearchIndexEntry;
   score: number;
   matchedFields: MatchedField[];
   debugScore: SearchScoreBreakdown;
+  matchedUtterance: string;
 }
 
 function createBreakdown(): SearchScoreBreakdown {
-  return { exact: 0, alias: 0, keyword: 0, tag: 0, token: 0, typo: 0, synonym: 0, intent: 0, priority: 0, penalty: 0 };
+  return {
+    exact: 0, alias: 0, keyword: 0, tag: 0, token: 0, typo: 0, synonym: 0, intent: 0,
+    priority: 0, penalty: 0, bm25: 0, ngram: 0, jaccard: 0,
+  };
 }
 
 function levenshtein(a: string, b: string): number {
@@ -47,90 +52,71 @@ function typoScore(query: string, values: string[]): number {
   return best;
 }
 
-function containsScore(query: string, values: string[], exactWeight: number, partialWeight: number): number {
-  return values.reduce((score, value) => {
-    if (!value) return score;
-    if (query === value) return Math.max(score, exactWeight);
-    if (query.includes(value) || value.includes(query)) return Math.max(score, partialWeight);
-    return score;
-  }, 0);
-}
-
 export function rankKnowledge(analysis: QueryAnalysis, entries: SearchIndexEntry[], intentId?: string): RankedKnowledge[] {
+  const queryTokens = [...new Set([...tokenize(analysis.normalized), ...analysis.synonymTokens])];
+  const queryNgrams = ngrams(analysis.normalized);
+  const bm25 = bm25Scores(queryTokens, entries.map((entry) => entry.documentTokens));
+
   return entries
-    .map((entry) => {
+    .map((entry, entryIndex) => {
       const debugScore = createBreakdown();
       const matchedFields = new Set<MatchedField>();
+      const searchablePhrases = [entry.question, ...entry.aliases, ...entry.utterances];
+      const exactIndex = searchablePhrases.findIndex((value) => analysis.normalized === value || analysis.compact === value.replace(/\s/g, ''));
+      const partialIndex = searchablePhrases.findIndex((value) =>
+        analysis.compact.length >= 3 && (analysis.compact.includes(value.replace(/\s/g, '')) || value.replace(/\s/g, '').includes(analysis.compact)),
+      );
+      const ngramScores = entry.utteranceNgrams.map((vector) => cosineSimilarity(queryNgrams, vector));
+      const bestNgramScore = Math.max(...ngramScores, 0);
+      const bestNgramIndex = ngramScores.indexOf(bestNgramScore);
+      const jaccardScores = searchablePhrases.map((value) => jaccardSimilarity(queryTokens, tokenize(value)));
+      const bestJaccardScore = Math.max(...jaccardScores, 0);
 
-      debugScore.priority = Math.min(entry.item.priority, 10);
-      debugScore.exact = containsScore(analysis.normalized, [entry.question], 86, 38);
-      if (debugScore.exact > 0) matchedFields.add('question');
-
-      debugScore.alias = containsScore(analysis.normalized, entry.aliases, 74, 34);
-      if (debugScore.alias > 0) matchedFields.add('alias');
-
-      const compactQuestionMatch = entry.questionCompact.includes(analysis.compact) || analysis.compact.includes(entry.questionCompact);
-      const compactAliasMatch = entry.aliasesCompact.some((alias) => alias.includes(analysis.compact) || analysis.compact.includes(alias));
-      if ((compactQuestionMatch || compactAliasMatch) && analysis.compact.length >= 3) {
-        debugScore.exact = Math.max(debugScore.exact, compactQuestionMatch ? 42 : 0);
-        debugScore.alias = Math.max(debugScore.alias, compactAliasMatch ? 36 : 0);
-        matchedFields.add(compactQuestionMatch ? 'question' : 'alias');
-      }
-
-      analysis.tokens.forEach((token) => {
-        if (entry.keywords.some((keyword) => keyword.includes(token) || token.includes(keyword))) {
-          debugScore.keyword += 18;
-          matchedFields.add('keyword');
-        }
-        if (entry.tags.some((tag) => tag.includes(token) || token.includes(tag))) {
-          debugScore.tag += 12;
-          matchedFields.add('tag');
-        }
-        if (entry.searchableText.includes(token)) {
-          debugScore.token += 8;
-        }
-      });
-
-      analysis.synonymTokens.forEach((token) => {
-        if (entry.searchableText.includes(token)) {
-          debugScore.synonym += 12;
-          matchedFields.add('synonym');
-        }
-      });
+      debugScore.exact = exactIndex >= 0 ? 1 : partialIndex >= 0 ? 0.72 : 0;
+      debugScore.alias = exactIndex > 0 ? 1 : 0;
+      debugScore.bm25 = bm25[entryIndex] ?? 0;
+      debugScore.ngram = bestNgramScore;
+      debugScore.jaccard = bestJaccardScore;
+      debugScore.token = bestJaccardScore;
+      debugScore.synonym = analysis.synonymTokens.some((token) => entry.searchableText.includes(token)) ? 1 : 0;
+      debugScore.intent = intentId && entry.item.intentId === intentId ? 1 : 0;
+      debugScore.priority = Math.min(entry.item.priority, 10) / 10;
+      if (debugScore.exact) matchedFields.add(exactIndex === 0 ? 'question' : 'alias');
+      if (debugScore.bm25) matchedFields.add('bm25');
+      if (debugScore.ngram >= 0.45) matchedFields.add('ngram');
+      if (debugScore.jaccard) matchedFields.add('token');
+      if (debugScore.synonym) matchedFields.add('synonym');
+      if (debugScore.intent) matchedFields.add('intent');
 
       if (intentId && entry.item.intentId === intentId) {
-        debugScore.intent = 14;
         matchedFields.add('intent');
       }
 
       debugScore.typo = typoScore(analysis.normalized, [entry.question, ...entry.aliases]);
-      if (debugScore.typo > 0) matchedFields.add('question');
-
-      if (entry.categoryName && analysis.normalized.includes(entry.categoryName)) {
-        debugScore.tag += 10;
-        matchedFields.add('tag');
-      }
-
       const hasNegativeMatch = entry.negativeKeywords.some((keyword) => analysis.normalized.includes(keyword));
-      debugScore.penalty = hasNegativeMatch ? 32 : 0;
-
-      const rawScore =
-        debugScore.exact +
-        debugScore.alias +
-        Math.min(debugScore.keyword, 42) +
-        Math.min(debugScore.tag, 24) +
-        Math.min(debugScore.token, 32) +
-        debugScore.typo +
-        Math.min(debugScore.synonym, 24) +
-        debugScore.intent +
-        debugScore.priority -
+      const shortGeneralPenalty = partialIndex < 0 && queryTokens.length <= 1 && analysis.compact.length < 4 ? 0.1 : 0;
+      debugScore.penalty = (hasNegativeMatch ? 0.25 : 0) + shortGeneralPenalty;
+      const weightedScore = debugScore.bm25 * 0.3 +
+        debugScore.ngram * 0.25 +
+        debugScore.jaccard * 0.15 +
+        debugScore.exact * 0.15 +
+        debugScore.synonym * 0.05 +
+        debugScore.intent * 0.1 -
         debugScore.penalty;
+      const hasDomainEvidence = exactIndex >= 0 || partialIndex >= 0 || debugScore.bm25 > 0 || debugScore.jaccard > 0 || debugScore.synonym > 0 || debugScore.ngram >= 0.65;
+      const rawScore = exactIndex >= 0
+        ? 0.98
+        : hasDomainEvidence
+          ? Math.max(weightedScore, debugScore.ngram * 0.95 - debugScore.penalty)
+          : 0;
+      const matchedIndex = exactIndex >= 0 ? exactIndex : bestNgramIndex >= 0 ? bestNgramIndex : 0;
 
       return {
         entry,
-        score: Math.max(0, Math.round(rawScore * 100) / 100),
+        score: Math.max(0, Math.min(1, Math.round(rawScore * 10000) / 10000)),
         matchedFields: [...matchedFields],
         debugScore,
+        matchedUtterance: searchablePhrases[matchedIndex] ?? entry.question,
       };
     })
     .sort((a, b) => b.score - a.score);

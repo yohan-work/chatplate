@@ -16,7 +16,18 @@ export function searchKnowledge(query: string, botConfig: BotConfig, options?: {
   if (analysis.intents.length > 1) {
     const intentResults = analysis.intents.map((intent) => {
       const intentAnalysis = analyzeQuery(intent, botConfig.search?.synonymGroups);
-      return decideSearchResult(rankKnowledge(intentAnalysis, index, options?.intentId));
+      const intentResult = decideSearchResult(rankKnowledge(intentAnalysis, index, options?.intentId));
+      if (!intentResult.item && intentResult.suggestions[0]) {
+        return { ...intentResult, item: intentResult.suggestions[0] };
+      }
+      if (!intentResult.item && intentAnalysis.tokens.length === 1) {
+        const token = intentAnalysis.tokens[0];
+        const keywordMatch = index.find((entry) => entry.keywords.some((keyword) => keyword === token || keyword.includes(token)));
+        if (keywordMatch) {
+          return { ...intentResult, confidence: 'medium' as const, item: keywordMatch.item };
+        }
+      }
+      return intentResult;
     });
     const items = composeMultiIntentItems(intentResults);
 

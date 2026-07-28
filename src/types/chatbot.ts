@@ -97,6 +97,17 @@ export interface SearchConfig {
   clarificationFlows?: ClarificationFlow[];
 }
 
+export type UtterancePersona = 'parent' | 'student' | 'neutral';
+export type UtteranceVariation = 'formal' | 'colloquial' | 'short' | 'synonym' | 'word-order' | 'spacing' | 'typo' | 'contextual';
+export type AnswerMode = 'verified' | 'safe-general' | 'handoff';
+export type KnowledgeRisk = 'low' | 'policy' | 'personal';
+
+export interface SearchUtterance {
+  text: string;
+  persona: UtterancePersona;
+  variation: UtteranceVariation;
+}
+
 export interface KnowledgeItem {
   id: string;
   categoryId: string;
@@ -105,6 +116,9 @@ export interface KnowledgeItem {
   aliases: string[];
   intentId?: string;
   examples?: string[];
+  utterances?: SearchUtterance[];
+  answerMode?: AnswerMode;
+  riskLevel?: KnowledgeRisk;
   tags?: string[];
   negativeKeywords?: string[];
   answer: string;
@@ -151,7 +165,7 @@ export interface ChatMessage {
 
 export type SearchConfidence = 'high' | 'medium' | 'low';
 
-export type MatchedField = 'question' | 'alias' | 'keyword' | 'tag' | 'synonym' | 'intent';
+export type MatchedField = 'question' | 'alias' | 'keyword' | 'tag' | 'synonym' | 'intent' | 'bm25' | 'ngram' | 'token';
 
 export interface SearchScoreBreakdown {
   exact: number;
@@ -164,6 +178,9 @@ export interface SearchScoreBreakdown {
   intent: number;
   priority: number;
   penalty: number;
+  bm25: number;
+  ngram: number;
+  jaccard: number;
 }
 
 export interface SearchResult {
@@ -176,6 +193,9 @@ export interface SearchResult {
   alternatives: KnowledgeItem[];
   matchedFields: MatchedField[];
   debugScore?: SearchScoreBreakdown;
+  matchedUtterance?: string;
+  scoreMargin?: number;
+  decisionReason?: 'exact' | 'confident' | 'ambiguous' | 'low-similarity';
 }
 
 export interface ConversationEvent {
@@ -185,6 +205,11 @@ export interface ConversationEvent {
   status: SearchResult['status'];
   confidence: SearchConfidence;
   matchedKnowledgeIds: string[];
+  candidateKnowledgeIds?: string[];
+  topScore?: number;
+  scoreMargin?: number;
+  matchedUtterance?: string;
+  decisionReason?: SearchResult['decisionReason'];
   feedback?: 'helpful' | 'not-helpful';
   createdAt: string;
 }

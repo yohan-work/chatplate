@@ -3,6 +3,25 @@ import type { KnowledgeItem } from '../types/chatbot';
 const SOURCE = '대표 승인 FAQ 패킷 대기';
 const UPDATED = '2026-07-28';
 
+function safeAnswer(intentId: string): string {
+  if (intentId === 'pricing' || intentId === 'policy') {
+    return '비용과 등록 조건은 프로그램과 상담 내용에 따라 달라질 수 있어 이곳에서 확정 금액이나 가능 여부를 안내하지 않습니다. 최신 기준은 카카오 상담 채널에서 확인해 주세요.';
+  }
+  if (intentId === 'privacy') {
+    return '학년과 학습 고민 정도만 먼저 알려 주세요. 주민등록번호, 계정 비밀번호, 상세 성적표, 건강·심리 정보 등 민감한 개인정보는 챗봇에 입력하지 마세요.';
+  }
+  if (intentId === 'fit') {
+    return '학생마다 현재 학습 상태와 목표가 달라 이 질문만으로 적합 여부를 단정하기는 어렵습니다. 현재 가장 큰 고민이 계획, 습관, 과목, 동기 중 어느 쪽인지 알려 주시면 관련 안내를 찾아드릴게요.';
+  }
+  if (intentId === 'program') {
+    return '코칭 방식은 학생의 목표와 현재 상태에 따라 달라질 수 있습니다. 구체적인 진행 방식과 가능한 범위는 카카오 상담에서 확인해 주세요.';
+  }
+  if (intentId === 'consultation') {
+    return '상담 방법과 가능한 일정은 운영 상황에 따라 달라질 수 있습니다. 카카오 상담 채널에 학생의 학년과 궁금한 내용을 간단히 남겨 주세요.';
+  }
+  return '코치 마이:웨이의 학습 코칭은 학생의 상황을 먼저 확인한 뒤 안내합니다. 구체적인 차이와 적합성은 카카오 상담에서 확인해 주세요.';
+}
+
 function draft(
   id: string,
   categoryId: string,
@@ -21,11 +40,11 @@ function draft(
     aliases,
     keywords,
     negativeKeywords,
-    answer: '',
+    answer: safeAnswer(intentId),
     buttons: [],
     relatedIds,
     priority: 7,
-    status: 'draft',
+    status: 'active',
     source: SOURCE,
     lastUpdated: UPDATED,
     handoffRecommended: true,
