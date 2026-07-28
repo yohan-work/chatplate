@@ -222,7 +222,7 @@ export interface SearchScoreBreakdown {
   routeCount: number;
 }
 
-export type QueryType = 'price' | 'method' | 'availability' | 'schedule' | 'policy' | 'comparison' | 'identity' | 'general';
+export type QueryType = 'price' | 'method' | 'availability' | 'schedule' | 'policy' | 'location' | 'comparison' | 'identity' | 'general';
 
 export interface QueryFeatures {
   normalized: string;

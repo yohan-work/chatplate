@@ -20,4 +20,10 @@ describe('queryFeatures', () => {
     expect(toJamo('코칭')).not.toBe('코칭');
     expect(toJamo('코 칭')).toBe(toJamo('코칭'));
   });
+
+  it('recognizes a short location question as an explicit topic', () => {
+    const features = extractQueryFeatures('위치가 어디?');
+    expect(features.queryType).toBe('location');
+    expect(features.followUp).toBe(true);
+  });
 });

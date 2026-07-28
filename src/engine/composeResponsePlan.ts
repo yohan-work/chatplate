@@ -23,13 +23,14 @@ export function composeResponsePlan(
   query: string,
   result: SearchResult,
   context?: ConversationContext,
+  options?: { continued?: boolean },
 ): ResponsePlan | undefined {
   const items = result.items ?? (result.item ? [result.item] : []);
   if (!items.length) return undefined;
 
   const variant = stableHash(`${query}:${items.map((item) => item.id).join(':')}:${context?.turnCount ?? 0}`) % OPENINGS.length;
   const features = extractQueryFeatures(query);
-  const contextOpening = context && context.turnCount > 0 && features.followUp
+  const contextOpening = context && context.turnCount > 0 && options?.continued
     ? '앞선 문의와 이어서 안내드리면,'
     : items.length > 1
       ? '질문하신 내용을 두 가지로 나누어 안내드릴게요.'

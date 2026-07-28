@@ -3,6 +3,7 @@ import type {
   BotConfig,
   ConversationContext,
   ConversationResolution,
+  QueryType,
   SmallTalkConfig,
   SmallTalkIntentId,
   SmallTalkRule,
@@ -16,9 +17,15 @@ const MAX_INPUT_LENGTH = 300;
 const REPEATED_CHARACTER = /^(.)\1{3,}$/u;
 const WRAPPER_INTENTS = new Set<SmallTalkIntentId>(['greeting', 'thanks', 'goodbye']);
 const CONTAINS_INTENTS = new Set<SmallTalkIntentId>(['human', 'abuse']);
+const INDEPENDENT_QUERY_TYPES = new Set<QueryType>(['price', 'policy', 'schedule', 'location', 'identity']);
 
 interface NormalizedRule extends SmallTalkRule {
   normalizedUtterances: string[];
+}
+
+interface RewrittenQuery {
+  query: string;
+  continued: boolean;
 }
 
 const ruleCache = new WeakMap<SmallTalkConfig, NormalizedRule[]>();
@@ -86,17 +93,25 @@ function smallTalkResolution(originalQuery: string, effectiveQuery: string, rule
   };
 }
 
-function rewriteFollowUpQuery(query: string, botConfig: BotConfig, context?: ConversationContext): string {
-  if (!context || Date.now() - context.updatedAt > 10 * 60 * 1000) return query;
+function rewriteFollowUpQuery(query: string, botConfig: BotConfig, context?: ConversationContext): RewrittenQuery {
+  if (!context || Date.now() - context.updatedAt > 10 * 60 * 1000) return { query, continued: false };
   const features = extractQueryFeatures(query);
-  if (!features.followUp) return query;
+  if (!features.followUp) return { query, continued: false };
 
   const contextEntities = Object.values(context.entities).filter((value) => !query.includes(value));
-  const hasStrongTopic = /(가격|비용|수강료|환불|취소|상담|등록|일정|시간|온라인|방문)/u.test(query);
-  if (hasStrongTopic) return [query, ...contextEntities].join(' ').trim();
+  const hasExplicitTopic = INDEPENDENT_QUERY_TYPES.has(features.queryType) ||
+    /(상담|등록|온라인|비대면|화상|방문|오프라인|대면)/u.test(query);
+  if (hasExplicitTopic) {
+    return {
+      query: [query, ...contextEntities].join(' ').trim(),
+      continued: false,
+    };
+  }
 
   const previous = context.lastKnowledgeIds.map((id) => findKnowledgeById(botConfig, id)).find(Boolean);
-  return previous ? `${previous.question} ${query}` : [query, ...contextEntities].join(' ').trim();
+  return previous
+    ? { query: `${previous.question} ${query}`, continued: true }
+    : { query: [query, ...contextEntities].join(' ').trim(), continued: false };
 }
 
 function contextPatch(
@@ -123,14 +138,14 @@ function knowledgeResolution(
   intentId?: string,
   context?: ConversationContext,
 ): ConversationResolution {
-  const rewrittenQuery = rewriteFollowUpQuery(effectiveQuery, botConfig, context);
-  const searchResult = searchKnowledge(rewrittenQuery, botConfig, { intentId });
+  const rewritten = rewriteFollowUpQuery(effectiveQuery, botConfig, context);
+  const searchResult = searchKnowledge(rewritten.query, botConfig, { intentId });
   return {
     kind: searchResult.status === 'fallback' ? 'fallback' : 'knowledge',
     originalQuery,
-    effectiveQuery: rewrittenQuery,
+    effectiveQuery: rewritten.query,
     searchResult,
-    responsePlan: composeResponsePlan(effectiveQuery, searchResult, context),
+    responsePlan: composeResponsePlan(effectiveQuery, searchResult, context, { continued: rewritten.continued }),
     contextPatch: contextPatch(effectiveQuery, searchResult, context),
   };
 }

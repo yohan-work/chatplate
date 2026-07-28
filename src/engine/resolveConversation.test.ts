@@ -74,6 +74,22 @@ describe('resolveConversation', () => {
     ];
     expect(followUp.effectiveQuery).toContain('중학생');
     expect(candidates.some((item) => item.intentId === 'pricing')).toBe(true);
+    expect(followUp.effectiveQuery).not.toContain('중학생도 코칭이 가능한가요');
+    expect(followUp.responsePlan?.text ?? '').not.toContain('앞선 문의와 이어서');
+  });
+
+  it('treats a short location question as a new topic instead of repeating the previous answer', () => {
+    const first = resolveConversation('코치 마이웨이는 어떤 곳인가요?', coach);
+    const location = resolveConversation('위치가 어디?', coach, { context: first.contextPatch });
+    expect(location.effectiveQuery).toBe('위치가 어디?');
+    expect(location.searchResult?.item?.id).toBe('location-001');
+    expect(location.responsePlan?.text).toContain('방문 상담 가능 여부');
+    expect(location.responsePlan?.text).not.toContain('앞선 문의와 이어서');
+    expect(location.responsePlan?.text).not.toContain('1:1 프리미엄 학습 코칭');
+
+    const repeated = resolveConversation('위치가 어디?', coach, { context: location.contextPatch });
+    expect(repeated.searchResult?.item?.id).toBe('location-001');
+    expect(repeated.responsePlan?.text).not.toContain('앞선 문의와 이어서');
   });
 
   it('uses the same default behavior for another domain', () => {

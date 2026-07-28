@@ -31,13 +31,18 @@ describe('composeResponsePlan', () => {
   });
 
   it('uses a contextual opening for a follow-up turn', () => {
-    const plan = composeResponsePlan('그럼 중학생은요?', result, {
-      lastKnowledgeIds: ['fit-1'],
-      entities: {},
-      pendingCandidateIds: [],
-      turnCount: 1,
-      updatedAt: Date.now(),
-    });
+    const plan = composeResponsePlan(
+      '그럼 중학생은요?',
+      result,
+      {
+        lastKnowledgeIds: ['fit-1'],
+        entities: {},
+        pendingCandidateIds: [],
+        turnCount: 1,
+        updatedAt: Date.now(),
+      },
+      { continued: true },
+    );
     expect(plan?.text).toContain('앞선 문의와 이어서');
   });
 });

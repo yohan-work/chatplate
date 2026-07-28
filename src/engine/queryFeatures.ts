@@ -28,6 +28,7 @@ function detectQueryType(value: string): QueryType {
   if (/(가격|비용|수강료|얼마|요금)/u.test(value)) return 'price';
   if (/(환불|취소|규정|정책|변경)/u.test(value)) return 'policy';
   if (/(언제|시간|일정|요일|횟수|주기)/u.test(value)) return 'schedule';
+  if (/(위치|주소|지점|오시는\s?길|찾아가는\s?길)/u.test(value)) return 'location';
   if (/(가능|되나요|할 수|대상)/u.test(value)) return 'availability';
   if (/(어떻게|방법|방식|진행)/u.test(value)) return 'method';
   if (/(차이|비교|다른|무엇이 더)/u.test(value)) return 'comparison';
