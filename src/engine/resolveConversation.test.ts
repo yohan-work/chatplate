@@ -57,6 +57,25 @@ describe('resolveConversation', () => {
     expect(result.searchResult?.status).toBe('fallback');
   });
 
+  it('rewrites an elliptical follow-up using the previous resolved FAQ', () => {
+    const first = resolveConversation('우리 아이에게 맞는지 궁금해요', coach);
+    const followUp = resolveConversation('그건 어떻게 진행돼요?', coach, { context: first.contextPatch });
+    expect(followUp.effectiveQuery).toContain('우리 아이에게 맞을지 궁금해요');
+    expect(followUp.responsePlan?.text).toContain('앞선 문의와 이어서');
+    expect(followUp.contextPatch?.turnCount).toBe(2);
+  });
+
+  it('lets a strong new topic override the previous intent while retaining useful entities', () => {
+    const first = resolveConversation('중학생 코칭이 가능한가요?', coach);
+    const followUp = resolveConversation('그럼 비용은요?', coach, { context: first.contextPatch });
+    const candidates = [
+      ...(followUp.searchResult?.items ?? (followUp.searchResult?.item ? [followUp.searchResult.item] : [])),
+      ...(followUp.searchResult?.suggestions ?? []),
+    ];
+    expect(followUp.effectiveQuery).toContain('중학생');
+    expect(candidates.some((item) => item.intentId === 'pricing')).toBe(true);
+  });
+
   it('uses the same default behavior for another domain', () => {
     const result = resolveConversation('안녕하세요', botConfigs['animal-hospital']);
     expect(result.kind).toBe('smalltalk');

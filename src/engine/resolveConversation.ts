@@ -1,13 +1,16 @@
 import { resolveSmallTalkConfig } from '../data/smallTalkDefaults';
 import type {
   BotConfig,
+  ConversationContext,
   ConversationResolution,
   SmallTalkConfig,
   SmallTalkIntentId,
   SmallTalkRule,
 } from '../types/chatbot';
+import { composeResponsePlan } from './composeResponsePlan';
 import { normalizeText } from './normalizeText';
-import { searchKnowledge } from './searchKnowledge';
+import { extractQueryFeatures } from './queryFeatures';
+import { findKnowledgeById, searchKnowledge } from './searchKnowledge';
 
 const MAX_INPUT_LENGTH = 300;
 const REPEATED_CHARACTER = /^(.)\1{3,}$/u;
@@ -83,13 +86,52 @@ function smallTalkResolution(originalQuery: string, effectiveQuery: string, rule
   };
 }
 
-function knowledgeResolution(originalQuery: string, effectiveQuery: string, botConfig: BotConfig, intentId?: string): ConversationResolution {
-  const searchResult = searchKnowledge(effectiveQuery, botConfig, { intentId });
+function rewriteFollowUpQuery(query: string, botConfig: BotConfig, context?: ConversationContext): string {
+  if (!context || Date.now() - context.updatedAt > 10 * 60 * 1000) return query;
+  const features = extractQueryFeatures(query);
+  if (!features.followUp) return query;
+
+  const contextEntities = Object.values(context.entities).filter((value) => !query.includes(value));
+  const hasStrongTopic = /(가격|비용|수강료|환불|취소|상담|등록|일정|시간|온라인|방문)/u.test(query);
+  if (hasStrongTopic) return [query, ...contextEntities].join(' ').trim();
+
+  const previous = context.lastKnowledgeIds.map((id) => findKnowledgeById(botConfig, id)).find(Boolean);
+  return previous ? `${previous.question} ${query}` : [query, ...contextEntities].join(' ').trim();
+}
+
+function contextPatch(
+  query: string,
+  result: ReturnType<typeof searchKnowledge>,
+  previous?: ConversationContext,
+): ConversationContext {
+  const items = result.items ?? (result.item ? [result.item] : result.suggestions.slice(0, 1));
+  const features = extractQueryFeatures(query);
+  return {
+    lastIntentId: items[0]?.intentId ?? previous?.lastIntentId,
+    lastKnowledgeIds: items.map((item) => item.id),
+    entities: { ...(previous?.entities ?? {}), ...features.entities },
+    pendingCandidateIds: result.status === 'suggestions' ? result.suggestions.map((item) => item.id) : [],
+    turnCount: (previous?.turnCount ?? 0) + 1,
+    updatedAt: Date.now(),
+  };
+}
+
+function knowledgeResolution(
+  originalQuery: string,
+  effectiveQuery: string,
+  botConfig: BotConfig,
+  intentId?: string,
+  context?: ConversationContext,
+): ConversationResolution {
+  const rewrittenQuery = rewriteFollowUpQuery(effectiveQuery, botConfig, context);
+  const searchResult = searchKnowledge(rewrittenQuery, botConfig, { intentId });
   return {
     kind: searchResult.status === 'fallback' ? 'fallback' : 'knowledge',
     originalQuery,
-    effectiveQuery,
+    effectiveQuery: rewrittenQuery,
     searchResult,
+    responsePlan: composeResponsePlan(effectiveQuery, searchResult, context),
+    contextPatch: contextPatch(effectiveQuery, searchResult, context),
   };
 }
 
@@ -147,9 +189,13 @@ export function validateSmallTalkConfig(config: SmallTalkConfig): string[] {
   return [...new Set(errors)];
 }
 
-export function resolveConversation(query: string, botConfig: BotConfig, options?: { intentId?: string }): ConversationResolution {
+export function resolveConversation(
+  query: string,
+  botConfig: BotConfig,
+  options?: { intentId?: string; context?: ConversationContext },
+): ConversationResolution {
   const smallTalk = resolveSmallTalkConfig(botConfig.bot, botConfig.smallTalk);
-  if (!smallTalk.enabled) return knowledgeResolution(query, query, botConfig, options?.intentId);
+  if (!smallTalk.enabled) return knowledgeResolution(query, query, botConfig, options?.intentId, options?.context);
 
   const rules = normalizedRules(smallTalk);
   const normalized = normalizeText(query);
@@ -170,8 +216,8 @@ export function resolveConversation(query: string, botConfig: BotConfig, options
   const stripped = stripSocialWrappers(normalized, rules);
   if (stripped.query !== normalized) {
     if (!stripped.query && stripped.matchedRule) return smallTalkResolution(query, normalized, stripped.matchedRule);
-    return knowledgeResolution(query, stripped.query, botConfig, options?.intentId);
+    return knowledgeResolution(query, stripped.query, botConfig, options?.intentId, options?.context);
   }
 
-  return knowledgeResolution(query, query, botConfig, options?.intentId);
+  return knowledgeResolution(query, query, botConfig, options?.intentId, options?.context);
 }

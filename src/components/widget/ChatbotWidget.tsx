@@ -10,7 +10,7 @@ import {
   createSmallTalkConversationEvent,
   updateConversationEventFeedback,
 } from '../../utils/conversationEvents';
-import type { BotConfig, ChatMessage, ClarificationOption, CustomerJourney, KnowledgeItem, Notice, SearchResult, Ticket, TicketSource, WidgetView } from '../../types/chatbot';
+import type { BotConfig, ChatMessage, ClarificationOption, ConversationContext, CustomerJourney, KnowledgeItem, Notice, SearchResult, Ticket, TicketSource, WidgetView } from '../../types/chatbot';
 import { BottomNavigation } from './BottomNavigation';
 import { HomeView } from '../home/HomeView';
 import { ChatView } from '../chat/ChatView';
@@ -58,6 +58,7 @@ export function ChatbotWidget({
   const [unknownQuestions, setUnknownQuestions] = useState<string[]>([]);
   const [contactRequest, setContactRequest] = useState<ContactRequestContext | null>(null);
   const [selectedIntentId, setSelectedIntentId] = useState<string>();
+  const [conversationContext, setConversationContext] = useState<ConversationContext>();
   const initialMessages = useMemo(
     () => [createMessage('bot', botConfig.bot.greeting)],
     [botConfig.bot.greeting],
@@ -71,6 +72,7 @@ export function ChatbotWidget({
     setUnknownQuestions([]);
     setContactRequest(null);
     setSelectedIntentId(undefined);
+    setConversationContext(undefined);
   }, [initialMessages]);
 
   useEffect(() => {
@@ -153,7 +155,7 @@ export function ChatbotWidget({
   };
 
   const handleSubmit = (query: string) => {
-    const resolution = resolveConversation(query, botConfig, { intentId: selectedIntentId });
+    const resolution = resolveConversation(query, botConfig, { intentId: selectedIntentId, context: conversationContext });
     const nextMessages: ChatMessage[] = [createMessage('user', query)];
 
     if (resolution.kind === 'smalltalk') {
@@ -171,6 +173,7 @@ export function ChatbotWidget({
     }
 
     const result = resolution.searchResult ?? searchKnowledge(query, botConfig, { intentId: selectedIntentId });
+    if (resolution.contextPatch) setConversationContext(resolution.contextPatch);
     const event = createConversationEvent(botConfig.bot.id, query, result, resolution.effectiveQuery);
     appendConversationEvent(event);
     onSearchResult?.(query, result);
@@ -187,7 +190,7 @@ export function ChatbotWidget({
       }));
     } else if (result.status === 'answer' && result.item) {
       const items = result.items ?? [result.item];
-      const answerText = items.map((item) => item.answer).join('\n\n');
+      const answerText = resolution.responsePlan?.text ?? items.map((item) => item.answer).join('\n\n');
       nextMessages.push(
         createMessage('bot', `${confidencePrefix(result.confidence)}${answerText}`, {
           buttons: result.item.buttons,
@@ -250,6 +253,8 @@ export function ChatbotWidget({
     setMessages([createMessage('bot', botConfig.bot.greeting)]);
     setUnknownQuestions([]);
     setContactRequest(null);
+    setSelectedIntentId(undefined);
+    setConversationContext(undefined);
     setActiveView('chat');
   };
 
