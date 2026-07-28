@@ -1,0 +1,29 @@
+.customer-page {
+  min-height: 100dvh;
+  padding: 20px;
+  color: #162238;
+  background: linear-gradient(180deg, #f3f7ff 0, #f8fafc 34rem, #fff 100%);
+}
+
+.customer-page__header,
+.customer-page__intro,
+.customer-page .chatplate-widget--page {
+  width: min(760px, 100%);
+  margin-inline: auto;
+}
+
+.customer-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 56px;
+}
+
+.customer-page__brand { color: inherit; font-weight: 900; letter-spacing: .06em; text-decoration: none; }
+.customer-page__contact { display: inline-flex; gap: 6px; align-items: center; color: #315b9a; font-size: 14px; font-weight: 700; text-decoration: none; }
+.customer-page__intro { padding: 52px 0 26px; }
+.customer-page__intro p { margin: 0 0 10px; color: #315b9a; font-size: 14px; font-weight: 800; }
+.customer-page__intro h1 { margin: 0; font-size: clamp(28px, 6vw, 44px); line-height: 1.18; letter-spacing: -.04em; }
+.customer-page__intro span { display: block; max-width: 600px; margin-top: 16px; color: #59657a; font-size: 15px; line-height: 1.6; }
+
+@media (max-width: 560px) { .customer-page { padding: 12px; } .customer-page__intro { padding-top: 32px; } }
