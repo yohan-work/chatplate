@@ -6,6 +6,7 @@ import {
   createSmallTalkConversationEvent,
   loadConversationEvents,
   updateConversationEventFeedback,
+  updateConversationEventSelection,
 } from './conversationEvents';
 
 function createStorage() {
@@ -33,9 +34,17 @@ describe('conversationEvents', () => {
       scoreMargin: 0.42,
       decisionReason: 'confident',
     };
-    const event = createConversationEvent('bot-1', '질문', result);
+    const event = createConversationEvent('bot-1', '질문', result, '질문', {
+      mode: 'clarification',
+      reason: 'close-candidates',
+      standaloneKnowledgeId: 'k1',
+      contextualKnowledgeId: 'k2',
+      standaloneScore: 0.9,
+      contextualScore: 0.88,
+    });
     appendConversationEvent(event, storage);
     updateConversationEventFeedback(event.id, 'helpful', storage);
+    updateConversationEventSelection(event.id, 'k1', storage);
     expect(loadConversationEvents(storage)[0]).toMatchObject({
       feedback: 'helpful',
       matchedKnowledgeIds: ['k1'],
@@ -44,6 +53,11 @@ describe('conversationEvents', () => {
       scoreMargin: 0.42,
       matchedUtterance: '질문 변형',
       decisionReason: 'confident',
+      routeMode: 'clarification',
+      routeReason: 'close-candidates',
+      standaloneKnowledgeId: 'k1',
+      contextualKnowledgeId: 'k2',
+      selectedCandidateId: 'k1',
     });
   });
 

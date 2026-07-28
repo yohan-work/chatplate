@@ -316,6 +316,13 @@ export interface ConversationEvent {
   scoreMargin?: number;
   matchedUtterance?: string;
   decisionReason?: SearchResult['decisionReason'];
+  routeMode?: ConversationRouteMode;
+  routeReason?: ConversationRouteDecision['reason'];
+  standaloneKnowledgeId?: string;
+  contextualKnowledgeId?: string;
+  standaloneScore?: number;
+  contextualScore?: number;
+  selectedCandidateId?: string;
   feedback?: 'helpful' | 'not-helpful';
   createdAt: string;
 }

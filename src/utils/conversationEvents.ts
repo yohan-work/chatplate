@@ -1,4 +1,4 @@
-import type { ConversationEvent, ConversationResolution, SearchResult } from '../types/chatbot';
+import type { ConversationEvent, ConversationResolution, ConversationRouteDecision, SearchResult } from '../types/chatbot';
 
 export const CONVERSATION_EVENTS_STORAGE_KEY = 'chatplate:conversation-events:v1';
 
@@ -13,7 +13,13 @@ function getBrowserStorage(): StorageLike | null {
   return window.localStorage;
 }
 
-export function createConversationEvent(botId: string, query: string, result: SearchResult, effectiveQuery = query): ConversationEvent {
+export function createConversationEvent(
+  botId: string,
+  query: string,
+  result: SearchResult,
+  effectiveQuery = query,
+  routeDecision?: ConversationRouteDecision,
+): ConversationEvent {
   const matchedItems = result.items ?? (result.item ? [result.item] : []);
   const candidateItems = [...matchedItems, ...result.suggestions, ...result.alternatives];
 
@@ -31,6 +37,12 @@ export function createConversationEvent(botId: string, query: string, result: Se
     scoreMargin: result.scoreMargin,
     matchedUtterance: result.matchedUtterance,
     decisionReason: result.decisionReason,
+    routeMode: routeDecision?.mode,
+    routeReason: routeDecision?.reason,
+    standaloneKnowledgeId: routeDecision?.standaloneKnowledgeId,
+    contextualKnowledgeId: routeDecision?.contextualKnowledgeId,
+    standaloneScore: routeDecision?.standaloneScore,
+    contextualScore: routeDecision?.contextualScore,
     createdAt: new Date().toISOString(),
   };
 }
@@ -79,6 +91,19 @@ export function updateConversationEventFeedback(
 ): void {
   saveConversationEvents(
     loadConversationEvents(storage).map((event) => (event.id === eventId ? { ...event, feedback } : event)),
+    storage,
+  );
+}
+
+export function updateConversationEventSelection(
+  eventId: string,
+  selectedCandidateId: string,
+  storage: StorageLike | null = getBrowserStorage(),
+): void {
+  saveConversationEvents(
+    loadConversationEvents(storage).map((event) =>
+      event.id === eventId ? { ...event, selectedCandidateId } : event,
+    ),
     storage,
   );
 }

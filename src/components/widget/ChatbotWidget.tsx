@@ -9,6 +9,7 @@ import {
   createConversationEvent,
   createSmallTalkConversationEvent,
   updateConversationEventFeedback,
+  updateConversationEventSelection,
 } from '../../utils/conversationEvents';
 import type { BotConfig, ChatMessage, ClarificationOption, ConversationContext, CustomerJourney, KnowledgeItem, Notice, SearchResult, Ticket, TicketSource, WidgetView } from '../../types/chatbot';
 import { BottomNavigation } from './BottomNavigation';
@@ -59,6 +60,7 @@ export function ChatbotWidget({
   const [contactRequest, setContactRequest] = useState<ContactRequestContext | null>(null);
   const [selectedIntentId, setSelectedIntentId] = useState<string>();
   const [conversationContext, setConversationContext] = useState<ConversationContext>();
+  const [pendingClarificationEventId, setPendingClarificationEventId] = useState<string>();
   const initialMessages = useMemo(
     () => [createMessage('bot', botConfig.bot.greeting)],
     [botConfig.bot.greeting],
@@ -73,6 +75,7 @@ export function ChatbotWidget({
     setContactRequest(null);
     setSelectedIntentId(undefined);
     setConversationContext(undefined);
+    setPendingClarificationEventId(undefined);
   }, [initialMessages]);
 
   useEffect(() => {
@@ -93,6 +96,18 @@ export function ChatbotWidget({
 
   const handleQuestionSelect = (item: KnowledgeItem) => {
     if (item.intentId) setSelectedIntentId(item.intentId);
+    setConversationContext((current) => ({
+      lastIntentId: item.intentId,
+      lastKnowledgeIds: [item.id],
+      entities: current?.entities ?? {},
+      pendingCandidateIds: [],
+      turnCount: (current?.turnCount ?? 0) + 1,
+      updatedAt: Date.now(),
+    }));
+    if (pendingClarificationEventId) {
+      updateConversationEventSelection(pendingClarificationEventId, item.id);
+      setPendingClarificationEventId(undefined);
+    }
     setActiveView('chat');
     setMessages((current) => [
       ...current,
@@ -174,15 +189,22 @@ export function ChatbotWidget({
 
     const result = resolution.searchResult ?? searchKnowledge(query, botConfig, { intentId: selectedIntentId });
     if (resolution.contextPatch) setConversationContext(resolution.contextPatch);
-    const event = createConversationEvent(botConfig.bot.id, query, result, resolution.effectiveQuery);
+    const event = createConversationEvent(botConfig.bot.id, query, result, resolution.effectiveQuery, resolution.routeDecision);
     appendConversationEvent(event);
+    if (resolution.routeDecision?.mode === 'clarification') setPendingClarificationEventId(event.id);
     onSearchResult?.(query, result);
 
     const clarification = (result.status === 'fallback' || result.status === 'suggestions')
       ? botConfig.search?.clarificationFlows?.find((flow) => flow.triggerTerms.some((term) => query.includes(term)))
       : undefined;
 
-    if (clarification) {
+    if (resolution.routeDecision?.mode === 'clarification') {
+      nextMessages.push(createMessage('bot', resolution.clarificationPrompt ?? '새 질문인지, 앞선 문의를 이어가는 것인지 확인해 주세요.', {
+        suggestions: result.suggestions,
+        confidence: 'medium',
+        id: event.id,
+      }));
+    } else if (clarification) {
       nextMessages.push(createMessage('bot', clarification.prompt, {
         clarificationOptions: clarification.options,
         confidence: 'medium',
@@ -255,6 +277,7 @@ export function ChatbotWidget({
     setContactRequest(null);
     setSelectedIntentId(undefined);
     setConversationContext(undefined);
+    setPendingClarificationEventId(undefined);
     setActiveView('chat');
   };
 

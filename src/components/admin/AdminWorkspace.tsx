@@ -607,6 +607,8 @@ function SearchQualityPanel({
   const lowConfidenceCount = events.filter((event) => event.confidence === 'low').length;
   const negativeFeedbackCount = events.filter((event) => event.feedback === 'not-helpful').length;
   const smallTalkCount = events.filter((event) => event.interactionType === 'smalltalk' || event.status === 'smalltalk').length;
+  const clarificationCount = events.filter((event) => event.routeMode === 'clarification').length;
+  const recentRouteEvents = [...events].filter((event) => event.routeMode).slice(-5).reverse();
 
   const addToKnowledgeField = (field: 'aliases' | 'keywords') => {
     if (!matchedItem || !query.trim()) return;
@@ -655,6 +657,10 @@ function SearchQualityPanel({
           <strong>{smallTalkCount}</strong>
           <span>일반 대화</span>
         </div>
+        <div>
+          <strong>{clarificationCount}</strong>
+          <span>문맥 확인</span>
+        </div>
         <button
           className="admin-reset-button"
           type="button"
@@ -683,6 +689,19 @@ function SearchQualityPanel({
           {evaluation.failures.slice(0, 3).map((failure) => (
             <span key={`${failure.expectedId}:${failure.query}`}>
               실패: “{failure.query}” → 기대 {failure.expectedId}, 후보 {failure.rankedIds.join(', ') || '없음'}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {recentRouteEvents.length ? (
+        <div className="quality-alternatives">
+          <strong>최근 문맥 라우팅</strong>
+          {recentRouteEvents.map((event) => (
+            <span key={event.id}>
+              {event.routeMode} · {event.routeReason} · 독립 {event.standaloneKnowledgeId ?? '없음'} ({event.standaloneScore ?? 0})
+              {' / '}문맥 {event.contextualKnowledgeId ?? '없음'} ({event.contextualScore ?? 0})
+              {event.selectedCandidateId ? ` → 선택 ${event.selectedCandidateId}` : ''}
             </span>
           ))}
         </div>
