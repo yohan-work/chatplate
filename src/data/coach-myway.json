@@ -1,0 +1,203 @@
+{
+  "bot": {
+    "id": "coach-myway",
+    "name": "코치 마이:웨이",
+    "title": "학습 코칭 상담 안내",
+    "description": "학습 코칭, 상담, 등록 관련 자주 묻는 질문을 안내합니다.",
+    "avatarUrl": "",
+    "greeting": "안녕하세요, 코치 마이:웨이입니다. 학습 코칭과 상담에 관한 등록된 안내를 도와드릴게요.",
+    "fallbackMessage": "등록된 안내에서 정확한 답변을 찾지 못했어요. 학생 상황에 맞는 안내는 카카오 상담 채널로 문의해 주세요.",
+    "disclaimer": "이 챗봇은 미리 등록된 안내를 제공합니다. 학생의 성적표, 주민등록번호 등 민감한 개인정보는 입력하지 마세요."
+  },
+  "theme": {
+    "primaryColor": "#315B9A",
+    "position": "bottom-right",
+    "homeTitle": "COACH MY:WAY"
+  },
+  "operation": {
+    "botHours": "24시간 등록 안내",
+    "csHours": "상담 가능 시간은 카카오 채널에서 확인해 주세요."
+  },
+  "handoff": {
+    "channelId": "kakao",
+    "label": "카카오 상담 채널 보기"
+  },
+  "notices": [],
+  "contactChannels": [
+    {
+      "id": "kakao",
+      "label": "카카오 상담 채널",
+      "type": "url",
+      "value": "https://linktr.ee/coachmyway",
+      "icon": "kakao"
+    },
+    {
+      "id": "blog",
+      "label": "공식 블로그",
+      "type": "url",
+      "value": "https://blog.naver.com/coachmyway",
+      "icon": "more"
+    }
+  ],
+  "categories": [
+    { "id": "intro", "name": "코칭 소개" },
+    { "id": "consultation", "name": "상담 신청" },
+    { "id": "program", "name": "코칭 안내" },
+    { "id": "policy", "name": "등록 및 정책" }
+  ],
+  "quickReplies": [
+    { "label": "코치 마이:웨이는 어떤 곳인가요?", "knowledgeId": "intro-001" },
+    { "label": "상담은 어떻게 신청하나요?", "knowledgeId": "consultation-001" },
+    { "label": "우리 아이에게 맞을지 궁금해요", "knowledgeId": "consultation-002" },
+    { "label": "비용이 궁금해요", "knowledgeId": "policy-001" }
+  ],
+  "knowledge": [
+    {
+      "id": "intro-001",
+      "categoryId": "intro",
+      "question": "코치 마이:웨이는 어떤 곳인가요?",
+      "keywords": ["코치마이웨이", "코치 마이웨이", "마이웨이", "소개", "학습코칭", "프리미엄"],
+      "aliases": ["어떤 학원인가요?", "어떤 곳이에요?", "코치 마이웨이가 뭐예요?", "서비스 소개해 주세요"],
+      "tags": ["1:1", "학습"],
+      "answer": "코치 마이:웨이는 1:1 프리미엄 학습 코칭을 안내하는 교육 브랜드입니다. 구체적인 코칭 대상과 방식은 상담에서 학생 상황에 맞춰 안내해 드립니다.",
+      "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
+      "relatedIds": ["consultation-001", "consultation-002"],
+      "priority": 10,
+      "status": "active",
+      "lastUpdated": "2026-07-27",
+      "source": "https://linktr.ee/coachmyway"
+    },
+    {
+      "id": "consultation-001",
+      "categoryId": "consultation",
+      "question": "상담은 어떻게 신청하나요?",
+      "keywords": ["상담", "신청", "문의", "예약", "카카오", "카톡"],
+      "aliases": ["상담 받고 싶어요", "상담 신청 방법", "문의는 어디로 하나요?", "카톡 상담 가능한가요?"],
+      "answer": "카카오 상담 채널에서 상담을 신청해 주세요. 학생의 학년, 현재 고민, 상담 희망 내용을 간단히 남기면 더 정확한 안내에 도움이 됩니다.",
+      "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
+      "relatedIds": ["consultation-002", "privacy-001"],
+      "priority": 10,
+      "status": "active",
+      "lastUpdated": "2026-07-27",
+      "source": "https://linktr.ee/coachmyway"
+    },
+    {
+      "id": "consultation-002",
+      "categoryId": "consultation",
+      "question": "우리 아이에게 맞을지 궁금해요.",
+      "keywords": ["우리 아이", "맞을지", "적합", "추천", "고민", "학습"],
+      "aliases": ["저에게 맞나요?", "아이에게 맞는지 알고 싶어요", "우리 아이에게 맞는지 상담 받고 싶어요", "상담 전에 확인하고 싶어요", "추천 대상이 궁금해요"],
+      "answer": "학생마다 학습 목표와 현재 어려움이 다르므로, 적합 여부는 상담에서 확인하는 것이 가장 정확합니다. 현재 학습 고민을 간단히 알려 주세요.",
+      "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
+      "relatedIds": ["consultation-001", "program-001"],
+      "priority": 10,
+      "status": "active",
+      "lastUpdated": "2026-07-27",
+      "source": "대표 승인 FAQ 패킷 수령 전 상담 안내"
+    },
+    {
+      "id": "program-001",
+      "categoryId": "program",
+      "question": "코칭은 어떻게 진행되나요?",
+      "keywords": ["코칭", "진행", "수업", "방식", "관리", "커리큘럼"],
+      "aliases": ["수업 방식이 궁금해요", "어떻게 공부를 도와주나요?", "관리 방식 알려주세요", "커리큘럼이 있나요?"],
+      "answer": "코칭 진행 방식은 학생의 목표와 상담 결과에 따라 달라질 수 있습니다. 현재 제공 가능한 방식과 상세 과정은 카카오 상담에서 확인해 주세요.",
+      "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
+      "relatedIds": ["consultation-002", "program-002"],
+      "priority": 9,
+      "status": "active",
+      "lastUpdated": "2026-07-27",
+      "source": "대표 승인 FAQ 패킷 수령 전 상담 안내",
+      "handoffRecommended": true
+    },
+    {
+      "id": "program-002",
+      "categoryId": "program",
+      "question": "어떤 학년과 과목을 코칭하나요?",
+      "keywords": ["학년", "과목", "중학생", "고등학생", "초등학생", "수능"],
+      "aliases": ["중학생도 가능한가요?", "고등학생 대상인가요?", "과목은 무엇을 하나요?", "수능 준비도 되나요?"],
+      "answer": "대상 학년과 과목별 안내는 운영 상황에 따라 달라질 수 있습니다. 희망 학년과 과목을 카카오 상담 채널에 남겨 주시면 확인 후 안내해 드립니다.",
+      "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
+      "relatedIds": ["consultation-002", "program-001"],
+      "priority": 10,
+      "status": "active",
+      "lastUpdated": "2026-07-27",
+      "source": "대표 승인 FAQ 패킷 수령 전 상담 안내",
+      "handoffRecommended": true
+    },
+    {
+      "id": "policy-001",
+      "categoryId": "policy",
+      "question": "비용이 궁금해요.",
+      "keywords": ["비용", "가격", "수강료", "요금", "금액", "결제"],
+      "aliases": ["얼마예요?", "수강료 알려주세요", "가격표 있나요?", "결제 방법이 궁금해요"],
+      "answer": "비용은 코칭 방식과 상담 내용에 따라 달라질 수 있어 이곳에서 확정 금액을 안내하지 않습니다. 카카오 상담 채널에서 최신 안내를 확인해 주세요.",
+      "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
+      "relatedIds": ["policy-002", "consultation-001"],
+      "priority": 10,
+      "status": "active",
+      "lastUpdated": "2026-07-27",
+      "source": "대표 승인 FAQ 패킷 수령 전 상담 안내",
+      "handoffRecommended": true
+    },
+    {
+      "id": "policy-002",
+      "categoryId": "policy",
+      "question": "등록, 변경, 환불은 어떻게 하나요?",
+      "keywords": ["등록", "변경", "환불", "취소", "해지", "약관"],
+      "aliases": ["등록 절차가 궁금해요", "환불 가능한가요?", "수업을 바꿀 수 있나요?", "취소하고 싶어요"],
+      "answer": "등록·변경·환불 기준은 신청한 프로그램과 시점에 따라 확인이 필요합니다. 카카오 상담 채널로 문의해 최신 기준을 안내받아 주세요.",
+      "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
+      "relatedIds": ["policy-001", "consultation-001"],
+      "priority": 10,
+      "status": "active",
+      "lastUpdated": "2026-07-27",
+      "source": "대표 승인 FAQ 패킷 수령 전 상담 안내",
+      "handoffRecommended": true
+    },
+    {
+      "id": "location-001",
+      "categoryId": "consultation",
+      "question": "어디에 있고 방문 상담이 가능한가요?",
+      "keywords": ["위치", "주소", "방문", "지점", "대연", "오시는길"],
+      "aliases": ["어디에 있나요?", "방문 상담 되나요?", "지점이 어디예요?", "찾아가는 길 알려주세요"],
+      "answer": "방문 상담 가능 여부와 안내 위치는 운영 일정에 따라 달라질 수 있습니다. 카카오 상담 채널에서 희망 일정을 함께 문의해 주세요.",
+      "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
+      "relatedIds": ["consultation-001", "hours-001"],
+      "priority": 9,
+      "status": "active",
+      "lastUpdated": "2026-07-27",
+      "source": "대표 승인 FAQ 패킷 수령 전 상담 안내",
+      "handoffRecommended": true
+    },
+    {
+      "id": "hours-001",
+      "categoryId": "consultation",
+      "question": "상담 가능한 시간은 언제인가요?",
+      "keywords": ["상담시간", "운영시간", "영업시간", "주말", "평일", "언제"],
+      "aliases": ["몇 시까지 상담하나요?", "주말 상담 가능한가요?", "평일에만 하나요?", "답변 시간 알려주세요"],
+      "answer": "상담 가능 시간은 카카오 상담 채널의 최신 안내를 확인해 주세요. 답변이 필요한 문의는 남겨 주시면 운영 시간에 순차적으로 안내됩니다.",
+      "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
+      "relatedIds": ["consultation-001", "location-001"],
+      "priority": 9,
+      "status": "active",
+      "lastUpdated": "2026-07-27",
+      "source": "https://linktr.ee/coachmyway",
+      "handoffRecommended": true
+    },
+    {
+      "id": "privacy-001",
+      "categoryId": "policy",
+      "question": "상담할 때 어떤 정보를 알려드리면 되나요?",
+      "keywords": ["정보", "개인정보", "성적", "상담내용", "준비", "입력"],
+      "aliases": ["성적표를 보내도 되나요?", "무엇을 준비하나요?", "개인정보가 걱정돼요", "상담 전에 알려줄 내용"],
+      "answer": "상담에는 학년, 학습 목표, 현재 고민 정도만 먼저 알려 주세요. 주민등록번호, 계정 비밀번호, 상세 성적표 등 민감한 개인정보는 채팅에 입력하지 마세요.",
+      "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
+      "relatedIds": ["consultation-001", "consultation-002"],
+      "priority": 10,
+      "status": "active",
+      "lastUpdated": "2026-07-27",
+      "source": "개인정보 최소 수집 운영 원칙"
+    }
+  ]
+}

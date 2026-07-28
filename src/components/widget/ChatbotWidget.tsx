@@ -166,6 +166,16 @@ export function ChatbotWidget({
   };
 
   const handleRequestHandoff = (message: ChatMessage) => {
+    const channel = botConfig.handoff
+      ? botConfig.contactChannels.find((entry) => entry.id === botConfig.handoff?.channelId)
+      : undefined;
+
+    if (channel) {
+      const href = channel.type === 'tel' ? `tel:${channel.value}` : channel.type === 'mailto' ? `mailto:${channel.value}` : channel.value;
+      window.open(href, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
     const messageIndex = messages.findIndex((item) => item.id === message.id);
     const previousUserMessage = messageIndex > 0
       ? [...messages.slice(0, messageIndex)].reverse().find((item) => item.role === 'user')

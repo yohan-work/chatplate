@@ -70,6 +70,7 @@ export function ChatView({
             onAction={onAction}
             onFeedback={onFeedback}
             onRequestHandoff={onRequestHandoff}
+            handoffLabel={botConfig.handoff?.label}
           />
         ))}
         {contactRequest ? (
@@ -86,7 +87,7 @@ export function ChatView({
       </div>
 
       <p className="disclaimer">{botConfig.bot.disclaimer}</p>
-      <ChatInput placeholder="AI에게 질문해 주세요." onSubmit={onSubmit} />
+      <ChatInput placeholder="궁금한 점을 입력해 주세요." onSubmit={onSubmit} />
     </div>
   );
 }

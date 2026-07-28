@@ -15,6 +15,24 @@ describe('searchKnowledge', () => {
     expect(result.item?.id).toBe('parking-001');
   });
 
+  it('returns the Coach My:Way consultation answer for parent-style questions', () => {
+    const result = searchKnowledge('우리 아이에게 맞는지 상담 받고 싶어요', botConfigs['coach-myway']);
+    expect(result.status).toBe('answer');
+    expect(result.item?.id).toBe('consultation-002');
+  });
+
+  it('returns the Coach My:Way price handoff answer for price questions', () => {
+    const result = searchKnowledge('수강료가 얼마예요?', botConfigs['coach-myway']);
+    expect(result.status).toBe('answer');
+    expect(result.item?.id).toBe('policy-001');
+    expect(result.item?.handoffRecommended).toBe(true);
+  });
+
+  it('falls back for unrelated Coach My:Way questions', () => {
+    const result = searchKnowledge('오늘 점심 메뉴가 뭐예요?', botConfigs['coach-myway']);
+    expect(result.status).toBe('fallback');
+  });
+
   it('falls back for unrelated questions', () => {
     const result = searchKnowledge('우주선 정비도 가능한가요?', botConfigs['alf-demo']);
     expect(result.status).toBe('fallback');

@@ -32,6 +32,11 @@ export interface OperationInfo {
   csHours: string;
 }
 
+export interface HandoffConfig {
+  channelId: string;
+  label: string;
+}
+
 export interface Notice {
   id: string;
   title: string;
@@ -83,6 +88,7 @@ export interface BotConfig {
   bot: BotInfo;
   theme: ThemeConfig;
   operation: OperationInfo;
+  handoff?: HandoffConfig;
   notices: Notice[];
   contactChannels: ContactChannel[];
   categories: Category[];
