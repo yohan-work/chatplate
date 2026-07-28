@@ -5,6 +5,7 @@ import {
   Clock,
   Inbox,
   ListChecks,
+  MessageCircle,
   MessageSquareWarning,
   Plus,
   RotateCcw,
@@ -15,7 +16,20 @@ import {
   Upload,
 } from 'lucide-react';
 import { searchKnowledge } from '../../engine/searchKnowledge';
-import type { AdminPanelView, BotConfig, BotConfigMap, KnowledgeItem, Notice, QuickReply, Ticket, TicketPriority, TicketStatus } from '../../types/chatbot';
+import { validateSmallTalkConfig } from '../../engine/resolveConversation';
+import { resolveSmallTalkConfig } from '../../data/smallTalkDefaults';
+import type {
+  AdminPanelView,
+  BotConfig,
+  BotConfigMap,
+  KnowledgeItem,
+  Notice,
+  QuickReply,
+  SmallTalkRule,
+  Ticket,
+  TicketPriority,
+  TicketStatus,
+} from '../../types/chatbot';
 import {
   createEmptyKnowledge,
   createEmptyNotice,
@@ -48,6 +62,7 @@ const panelItems: Array<{ id: AdminPanelView; label: string; icon: typeof Bot }>
   { id: 'notices', label: '공지', icon: Bell },
   { id: 'knowledge', label: 'FAQ', icon: Search },
   { id: 'quickReplies', label: '추천 질문', icon: ListChecks },
+  { id: 'smallTalk', label: '일반 대화', icon: MessageCircle },
   { id: 'quality', label: '검색 품질', icon: Sparkles },
   { id: 'tickets', label: '문의함', icon: Inbox },
   { id: 'data', label: '데이터', icon: Upload },
@@ -448,6 +463,108 @@ function QuickReplyEditor({
   );
 }
 
+function SmallTalkEditor({
+  config,
+  onUpdate,
+}: {
+  config: BotConfig;
+  onUpdate: (updater: (config: BotConfig) => BotConfig) => void;
+}) {
+  const smallTalk = useMemo(() => resolveSmallTalkConfig(config.bot, config.smallTalk), [config.bot, config.smallTalk]);
+  const validationErrors = useMemo(() => validateSmallTalkConfig(smallTalk), [smallTalk]);
+
+  const updateConfig = (enabled: boolean) => {
+    onUpdate((current) => {
+      const currentSmallTalk = resolveSmallTalkConfig(current.bot, current.smallTalk);
+      return { ...current, smallTalk: { ...currentSmallTalk, enabled } };
+    });
+  };
+
+  const updateRule = (ruleId: string, patch: Partial<SmallTalkRule>) => {
+    onUpdate((current) => {
+      const currentSmallTalk = resolveSmallTalkConfig(current.bot, current.smallTalk);
+      return {
+        ...current,
+        smallTalk: {
+          ...currentSmallTalk,
+          rules: currentSmallTalk.rules.map((rule) => (rule.id === ruleId ? { ...rule, ...patch } : rule)),
+        },
+      };
+    });
+  };
+
+  return (
+    <section className="admin-panel">
+      <PanelHeader
+        title="일반 대화"
+        description="FAQ 검색 전에 처리할 인사·감사·도움말·상담원 요청 등의 고정 응답을 관리합니다."
+      />
+      <label className="admin-check">
+        <input type="checkbox" checked={smallTalk.enabled} onChange={(event) => updateConfig(event.target.checked)} />
+        <span>일반 대화 자동 응답 사용</span>
+      </label>
+
+      {validationErrors.length > 0 ? (
+        <div className="smalltalk-errors" role="alert">
+          <strong>데이터를 확인해 주세요.</strong>
+          {validationErrors.map((error) => <span key={error}>{error}</span>)}
+        </div>
+      ) : null}
+
+      <div className="smalltalk-grid">
+        {smallTalk.rules.map((rule) => (
+          <article className="smalltalk-card" key={rule.id}>
+            <div className="smalltalk-card__header">
+              <div>
+                <strong>{rule.label}</strong>
+                <span>{rule.intentId} · 발화 {rule.utterances.length}개</span>
+              </div>
+              <label className="admin-check">
+                <input
+                  type="checkbox"
+                  checked={rule.enabled}
+                  onChange={(event) => updateRule(rule.id, { enabled: event.target.checked })}
+                />
+                <span>활성</span>
+              </label>
+            </div>
+            <TextAreaField
+              label="응답 문구"
+              value={rule.response}
+              rows={4}
+              onChange={(value) => updateRule(rule.id, { response: value })}
+            />
+            <TextAreaField
+              label="인식 발화 · 쉼표 또는 줄바꿈으로 구분"
+              value={rule.utterances.join(', ')}
+              rows={5}
+              onChange={(value) => updateRule(rule.id, { utterances: parseCommaList(value.replace(/\n/g, ',')) })}
+            />
+            <div className="smalltalk-options">
+              <label className="admin-check">
+                <input
+                  type="checkbox"
+                  checked={rule.showSuggestions}
+                  onChange={(event) => updateRule(rule.id, { showSuggestions: event.target.checked })}
+                />
+                <span>추천 질문 표시</span>
+              </label>
+              <label className="admin-check">
+                <input
+                  type="checkbox"
+                  checked={rule.handoffCta}
+                  onChange={(event) => updateRule(rule.id, { handoffCta: event.target.checked })}
+                />
+                <span>상담 연결 표시</span>
+              </label>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function UnknownQuestionsPanel({ questions }: { questions: string[] }) {
   return (
     <section className="admin-panel">
@@ -487,6 +604,7 @@ function SearchQualityPanel({
   );
   const lowConfidenceCount = events.filter((event) => event.confidence === 'low').length;
   const negativeFeedbackCount = events.filter((event) => event.feedback === 'not-helpful').length;
+  const smallTalkCount = events.filter((event) => event.interactionType === 'smalltalk' || event.status === 'smalltalk').length;
 
   const addToKnowledgeField = (field: 'aliases' | 'keywords') => {
     if (!matchedItem || !query.trim()) return;
@@ -530,6 +648,10 @@ function SearchQualityPanel({
         <div>
           <strong>{negativeFeedbackCount}</strong>
           <span>부정 피드백</span>
+        </div>
+        <div>
+          <strong>{smallTalkCount}</strong>
+          <span>일반 대화</span>
         </div>
         <button
           className="admin-reset-button"
@@ -945,6 +1067,7 @@ function renderActivePanel(
   if (activeView === 'notices') return <NoticeEditor config={config} onUpdate={onUpdate} />;
   if (activeView === 'knowledge') return <KnowledgeEditor config={config} onUpdate={onUpdate} />;
   if (activeView === 'quickReplies') return <QuickReplyEditor config={config} onUpdate={onUpdate} />;
+  if (activeView === 'smallTalk') return <SmallTalkEditor config={config} onUpdate={onUpdate} />;
   if (activeView === 'quality') return <SearchQualityPanel config={config} unknownQuestions={unknownQuestions} onUpdate={onUpdate} />;
   if (activeView === 'tickets') return <TicketInboxPanel config={config} ticketVersion={ticketVersion} onTicketVersionChange={onTicketVersionChange} onUpdate={onUpdate} />;
   if (activeView === 'data') return <DataPortabilityPanel botConfigs={botConfigs} selectedBotId={selectedBotId} onReplaceBotConfigs={onReplaceBotConfigs} />;

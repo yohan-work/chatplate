@@ -1,4 +1,5 @@
-import type { BotConfig, BotConfigMap, ConversationEvent } from '../types/chatbot';
+import { validateSmallTalkConfig } from '../engine/resolveConversation';
+import type { BotConfig, BotConfigMap, ConversationEvent, SmallTalkConfig, SmallTalkIntentId } from '../types/chatbot';
 
 export interface ValidationResult {
   ok: boolean;
@@ -43,6 +44,48 @@ export function validateBotConfig(value: unknown): ValidationResult {
 
   if (value.customerJourneys !== undefined && !Array.isArray(value.customerJourneys)) errors.push('customerJourneys must be an array when provided');
   if (value.search !== undefined && !isRecord(value.search)) errors.push('search must be an object when provided');
+  if (value.smallTalk !== undefined) {
+    if (!isRecord(value.smallTalk)) {
+      errors.push('smallTalk must be an object when provided');
+    } else {
+      const smallTalk = value.smallTalk;
+      const allowedIntents = new Set<SmallTalkIntentId>(['greeting', 'thanks', 'goodbye', 'help', 'identity', 'human', 'abuse', 'noise']);
+      if (typeof smallTalk.enabled !== 'boolean') errors.push('smallTalk.enabled must be a boolean');
+      if (!Array.isArray(smallTalk.rules)) {
+        errors.push('smallTalk.rules must be an array');
+      } else {
+        let shapeIsValid = true;
+        smallTalk.rules.forEach((rule, index) => {
+          if (!isRecord(rule)) {
+            errors.push(`smallTalk.rules[${index}] must be an object`);
+            shapeIsValid = false;
+            return;
+          }
+          ['id', 'label', 'response'].forEach((key) => {
+            if (typeof rule[key] !== 'string') {
+              errors.push(`smallTalk.rules[${index}].${key} must be a string`);
+              shapeIsValid = false;
+            }
+          });
+          if (typeof rule.intentId !== 'string' || !allowedIntents.has(rule.intentId as SmallTalkIntentId)) {
+            errors.push(`smallTalk.rules[${index}].intentId is invalid`);
+            shapeIsValid = false;
+          }
+          ['enabled', 'handoffCta', 'showSuggestions'].forEach((key) => {
+            if (typeof rule[key] !== 'boolean') {
+              errors.push(`smallTalk.rules[${index}].${key} must be a boolean`);
+              shapeIsValid = false;
+            }
+          });
+          if (!Array.isArray(rule.utterances) || !rule.utterances.every((utterance) => typeof utterance === 'string')) {
+            errors.push(`smallTalk.rules[${index}].utterances must be a string array`);
+            shapeIsValid = false;
+          }
+        });
+        if (shapeIsValid) errors.push(...validateSmallTalkConfig(smallTalk as unknown as SmallTalkConfig));
+      }
+    }
+  }
 
   return { ok: errors.length === 0, errors };
 }
@@ -92,6 +135,9 @@ export function conversationEventsToCsv(events: ConversationEvent[]): string {
     'query',
     'status',
     'confidence',
+    'interactionType',
+    'effectiveQuery',
+    'smallTalkIntent',
     'matchedKnowledgeIds',
     'candidateKnowledgeIds',
     'topScore',
@@ -107,6 +153,9 @@ export function conversationEventsToCsv(events: ConversationEvent[]): string {
     event.query,
     event.status,
     event.confidence,
+    event.interactionType ?? '',
+    event.effectiveQuery ?? '',
+    event.smallTalkIntent ?? '',
     event.matchedKnowledgeIds.join('|'),
     event.candidateKnowledgeIds?.join('|') ?? '',
     event.topScore ?? '',

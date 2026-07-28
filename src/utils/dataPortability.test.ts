@@ -18,6 +18,15 @@ describe('dataPortability', () => {
     expect(result.configs?.cafe.bot.name).toBe('라운드브루');
   });
 
+  it('keeps legacy configs valid and rejects malformed small-talk data', () => {
+    const legacy = { ...botConfigs['alf-demo'], smallTalk: undefined };
+    expect(validateBotConfig(legacy).ok).toBe(true);
+    expect(validateBotConfig({
+      ...botConfigs['alf-demo'],
+      smallTalk: { enabled: true, rules: [{ id: 'broken' }] },
+    }).ok).toBe(false);
+  });
+
   it('converts conversation events to csv', () => {
     const csv = conversationEventsToCsv([
       {
@@ -26,6 +35,9 @@ describe('dataPortability', () => {
         query: '가격, 알려줘',
         status: 'answer',
         confidence: 'high',
+        interactionType: 'smalltalk',
+        effectiveQuery: '가격 알려줘',
+        smallTalkIntent: 'greeting',
         matchedKnowledgeIds: ['k1'],
         feedback: 'helpful',
         createdAt: '2026-06-30T00:00:00.000Z',
@@ -34,5 +46,6 @@ describe('dataPortability', () => {
 
     expect(csv).toContain('"가격, 알려줘"');
     expect(csv).toContain('matchedKnowledgeIds');
+    expect(csv).toContain('smallTalkIntent');
   });
 });
