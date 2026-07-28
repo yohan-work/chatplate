@@ -14,13 +14,21 @@ function getBrowserStorage(): StorageLike | null {
 }
 
 export function createConversationEvent(botId: string, query: string, result: SearchResult): ConversationEvent {
+  const matchedItems = result.items ?? (result.item ? [result.item] : []);
+  const candidateItems = [...matchedItems, ...result.suggestions, ...result.alternatives];
+
   return {
     id: `event-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     botId,
     query,
     status: result.status,
     confidence: result.confidence,
-    matchedKnowledgeIds: (result.items ?? (result.item ? [result.item] : [])).map((item) => item.id),
+    matchedKnowledgeIds: matchedItems.map((item) => item.id),
+    candidateKnowledgeIds: [...new Set(candidateItems.map((item) => item.id))],
+    topScore: result.score,
+    scoreMargin: result.scoreMargin,
+    matchedUtterance: result.matchedUtterance,
+    decisionReason: result.decisionReason,
     createdAt: new Date().toISOString(),
   };
 }

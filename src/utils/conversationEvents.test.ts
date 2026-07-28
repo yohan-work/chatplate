@@ -23,10 +23,21 @@ describe('conversationEvents', () => {
       alternatives: [],
       matchedFields: ['question'],
       items: [item],
+      matchedUtterance: '질문 변형',
+      scoreMargin: 0.42,
+      decisionReason: 'confident',
     };
     const event = createConversationEvent('bot-1', '질문', result);
     appendConversationEvent(event, storage);
     updateConversationEventFeedback(event.id, 'helpful', storage);
-    expect(loadConversationEvents(storage)[0]).toMatchObject({ feedback: 'helpful', matchedKnowledgeIds: ['k1'] });
+    expect(loadConversationEvents(storage)[0]).toMatchObject({
+      feedback: 'helpful',
+      matchedKnowledgeIds: ['k1'],
+      candidateKnowledgeIds: ['k1'],
+      topScore: 90,
+      scoreMargin: 0.42,
+      matchedUtterance: '질문 변형',
+      decisionReason: 'confident',
+    });
   });
 });

@@ -480,7 +480,7 @@ function SearchQualityPanel({
   const [query, setQuery] = useState(unknownQuestions[0] ?? '');
   const [eventVersion, setEventVersion] = useState(0);
   const result = useMemo(() => (query.trim() ? searchKnowledge(query, config) : null), [config, query]);
-  const matchedItem = result?.item;
+  const matchedItem = result?.item ?? result?.suggestions[0];
   const events = useMemo(
     () => loadConversationEvents().filter((event) => event.botId === config.bot.id),
     [config.bot.id, eventVersion],
@@ -551,7 +551,11 @@ function SearchQualityPanel({
             <div>
               <span className={`confidence-badge confidence-badge--${result.confidence}`}>{result.confidence}</span>
               <strong>{matchedItem?.question ?? '매칭된 FAQ 없음'}</strong>
-              <p>score {result.score} · {result.matchedFields.join(', ') || 'matched field 없음'}</p>
+              <p>
+                score {result.score} · margin {result.scoreMargin ?? 0} · {result.decisionReason ?? '판정 없음'}
+              </p>
+              <p>{result.matchedFields.join(', ') || 'matched field 없음'}</p>
+              {result.matchedUtterance ? <p>가장 가까운 발화: “{result.matchedUtterance}”</p> : null}
             </div>
             <div className="quality-actions">
               <button type="button" onClick={() => addToKnowledgeField('aliases')} disabled={!matchedItem}>

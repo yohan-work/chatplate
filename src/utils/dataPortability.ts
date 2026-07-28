@@ -86,7 +86,21 @@ function escapeCsvCell(value: unknown): string {
 }
 
 export function conversationEventsToCsv(events: ConversationEvent[]): string {
-  const headers = ['id', 'botId', 'query', 'status', 'confidence', 'matchedKnowledgeIds', 'feedback', 'createdAt'];
+  const headers = [
+    'id',
+    'botId',
+    'query',
+    'status',
+    'confidence',
+    'matchedKnowledgeIds',
+    'candidateKnowledgeIds',
+    'topScore',
+    'scoreMargin',
+    'matchedUtterance',
+    'decisionReason',
+    'feedback',
+    'createdAt',
+  ];
   const rows = events.map((event) => [
     event.id,
     event.botId,
@@ -94,6 +108,11 @@ export function conversationEventsToCsv(events: ConversationEvent[]): string {
     event.status,
     event.confidence,
     event.matchedKnowledgeIds.join('|'),
+    event.candidateKnowledgeIds?.join('|') ?? '',
+    event.topScore ?? '',
+    event.scoreMargin ?? '',
+    event.matchedUtterance ?? '',
+    event.decisionReason ?? '',
     event.feedback ?? '',
     event.createdAt,
   ]);
