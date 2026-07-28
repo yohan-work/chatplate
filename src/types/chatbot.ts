@@ -66,12 +66,45 @@ export interface QuickReply {
   knowledgeId: string;
 }
 
+export interface CustomerJourney {
+  id: string;
+  title: string;
+  description: string;
+  knowledgeIds: string[];
+  intentIds: string[];
+}
+
+export interface SynonymGroup {
+  id: string;
+  terms: string[];
+}
+
+export interface ClarificationOption {
+  label: string;
+  intentId?: string;
+  knowledgeId?: string;
+}
+
+export interface ClarificationFlow {
+  id: string;
+  triggerTerms: string[];
+  prompt: string;
+  options: ClarificationOption[];
+}
+
+export interface SearchConfig {
+  synonymGroups?: SynonymGroup[];
+  clarificationFlows?: ClarificationFlow[];
+}
+
 export interface KnowledgeItem {
   id: string;
   categoryId: string;
   question: string;
   keywords: string[];
   aliases: string[];
+  intentId?: string;
+  examples?: string[];
   tags?: string[];
   negativeKeywords?: string[];
   answer: string;
@@ -89,6 +122,8 @@ export interface BotConfig {
   theme: ThemeConfig;
   operation: OperationInfo;
   handoff?: HandoffConfig;
+  customerJourneys?: CustomerJourney[];
+  search?: SearchConfig;
   notices: Notice[];
   contactChannels: ContactChannel[];
   categories: Category[];
@@ -111,11 +146,12 @@ export interface ChatMessage {
   feedback?: 'helpful' | 'not-helpful';
   handoffCta?: boolean;
   ticketId?: string;
+  clarificationOptions?: ClarificationOption[];
 }
 
 export type SearchConfidence = 'high' | 'medium' | 'low';
 
-export type MatchedField = 'question' | 'alias' | 'keyword' | 'tag';
+export type MatchedField = 'question' | 'alias' | 'keyword' | 'tag' | 'synonym' | 'intent';
 
 export interface SearchScoreBreakdown {
   exact: number;
@@ -124,6 +160,8 @@ export interface SearchScoreBreakdown {
   tag: number;
   token: number;
   typo: number;
+  synonym: number;
+  intent: number;
   priority: number;
   penalty: number;
 }

@@ -76,6 +76,24 @@
   transform: translateY(0);
 }
 
+.chatplate-widget--page {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  width: 100%;
+  height: min(760px, calc(100dvh - 210px));
+  min-height: 560px;
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.journey-list { display: grid; gap: 8px; }
+.journey-card { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; padding: 13px; text-align: left; border: 1px solid var(--color-border); border-radius: 12px; color: var(--color-text-primary); background: var(--color-surface-soft); }
+.journey-card strong { font-size: 14px; }
+.journey-card span { grid-column: 1; color: var(--color-text-secondary); font-size: 12px; line-height: 1.45; }
+.journey-card svg { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: var(--chatplate-primary); }
+
 .widget-topbar {
   display: grid;
   grid-template-columns: 1fr 36px 36px;

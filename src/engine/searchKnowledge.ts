@@ -7,16 +7,16 @@ import { rankKnowledge } from './rankKnowledge';
 export const ANSWER_THRESHOLD = HIGH_CONFIDENCE_THRESHOLD;
 export const SUGGESTION_THRESHOLD = MEDIUM_CONFIDENCE_THRESHOLD;
 
-export function searchKnowledge(query: string, botConfig: BotConfig): SearchResult {
-  const analysis = analyzeQuery(query);
+export function searchKnowledge(query: string, botConfig: BotConfig, options?: { intentId?: string }): SearchResult {
+  const analysis = analyzeQuery(query, botConfig.search?.synonymGroups);
   const index = buildSearchIndex(botConfig);
-  const ranked = rankKnowledge(analysis, index);
+  const ranked = rankKnowledge(analysis, index, options?.intentId);
   const result = decideSearchResult(ranked);
 
   if (analysis.intents.length > 1) {
     const intentResults = analysis.intents.map((intent) => {
-      const intentAnalysis = analyzeQuery(intent);
-      return decideSearchResult(rankKnowledge(intentAnalysis, index));
+      const intentAnalysis = analyzeQuery(intent, botConfig.search?.synonymGroups);
+      return decideSearchResult(rankKnowledge(intentAnalysis, index, options?.intentId));
     });
     const items = composeMultiIntentItems(intentResults);
 

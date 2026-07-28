@@ -28,9 +28,33 @@ describe('searchKnowledge', () => {
     expect(result.item?.handoffRecommended).toBe(true);
   });
 
+  it('uses Coach My:Way synonym groups for conversational inquiry wording', () => {
+    const result = searchKnowledge('카톡으로 문의하고 싶어요', botConfigs['coach-myway']);
+    expect(result.status).toBe('answer');
+    expect(result.item?.id).toBe('consultation-001');
+  });
+
+  it('returns suggestions instead of a single answer for close matches', () => {
+    const config = {
+      ...botConfigs['coach-myway'],
+      knowledge: [
+        { ...botConfigs['coach-myway'].knowledge.find((item) => item.id === 'policy-001')!, question: '비용 안내', aliases: [], keywords: ['비용'], priority: 8 },
+        { ...botConfigs['coach-myway'].knowledge.find((item) => item.id === 'policy-002')!, question: '비용 안내', aliases: [], keywords: ['비용'], priority: 8 },
+      ],
+    };
+    const result = searchKnowledge('비용 안내', config);
+    expect(result.status).toBe('suggestions');
+  });
+
   it('falls back for unrelated Coach My:Way questions', () => {
     const result = searchKnowledge('오늘 점심 메뉴가 뭐예요?', botConfigs['coach-myway']);
     expect(result.status).toBe('fallback');
+  });
+
+  it('keeps the Coach My:Way 50-question coverage catalog as drafts until approved', () => {
+    const knowledge = botConfigs['coach-myway'].knowledge;
+    expect(knowledge).toHaveLength(50);
+    expect(knowledge.filter((item) => item.status === 'draft')).toHaveLength(40);
   });
 
   it('falls back for unrelated questions', () => {

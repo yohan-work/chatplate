@@ -10,7 +10,7 @@ export interface RankedKnowledge {
 }
 
 function createBreakdown(): SearchScoreBreakdown {
-  return { exact: 0, alias: 0, keyword: 0, tag: 0, token: 0, typo: 0, priority: 0, penalty: 0 };
+  return { exact: 0, alias: 0, keyword: 0, tag: 0, token: 0, typo: 0, synonym: 0, intent: 0, priority: 0, penalty: 0 };
 }
 
 function levenshtein(a: string, b: string): number {
@@ -56,7 +56,7 @@ function containsScore(query: string, values: string[], exactWeight: number, par
   }, 0);
 }
 
-export function rankKnowledge(analysis: QueryAnalysis, entries: SearchIndexEntry[]): RankedKnowledge[] {
+export function rankKnowledge(analysis: QueryAnalysis, entries: SearchIndexEntry[], intentId?: string): RankedKnowledge[] {
   return entries
     .map((entry) => {
       const debugScore = createBreakdown();
@@ -91,6 +91,18 @@ export function rankKnowledge(analysis: QueryAnalysis, entries: SearchIndexEntry
         }
       });
 
+      analysis.synonymTokens.forEach((token) => {
+        if (entry.searchableText.includes(token)) {
+          debugScore.synonym += 12;
+          matchedFields.add('synonym');
+        }
+      });
+
+      if (intentId && entry.item.intentId === intentId) {
+        debugScore.intent = 14;
+        matchedFields.add('intent');
+      }
+
       debugScore.typo = typoScore(analysis.normalized, [entry.question, ...entry.aliases]);
       if (debugScore.typo > 0) matchedFields.add('question');
 
@@ -109,6 +121,8 @@ export function rankKnowledge(analysis: QueryAnalysis, entries: SearchIndexEntry
         Math.min(debugScore.tag, 24) +
         Math.min(debugScore.token, 32) +
         debugScore.typo +
+        Math.min(debugScore.synonym, 24) +
+        debugScore.intent +
         debugScore.priority -
         debugScore.penalty;
 

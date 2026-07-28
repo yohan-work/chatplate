@@ -4,7 +4,7 @@ import { Bot, RotateCcw, X } from 'lucide-react';
 import { getFallbackSuggestions } from '../../engine/getFallbackSuggestions';
 import { findKnowledgeById, searchKnowledge } from '../../engine/searchKnowledge';
 import { appendConversationEvent, createConversationEvent, updateConversationEventFeedback } from '../../utils/conversationEvents';
-import type { BotConfig, ChatMessage, KnowledgeItem, Notice, SearchResult, Ticket, TicketSource, WidgetView } from '../../types/chatbot';
+import type { BotConfig, ChatMessage, ClarificationOption, CustomerJourney, KnowledgeItem, Notice, SearchResult, Ticket, TicketSource, WidgetView } from '../../types/chatbot';
 import { BottomNavigation } from './BottomNavigation';
 import { HomeView } from '../home/HomeView';
 import { ChatView } from '../chat/ChatView';
@@ -17,6 +17,7 @@ interface ChatbotWidgetProps {
   botConfig: BotConfig;
   isOpen: boolean;
   onClose: () => void;
+  variant?: 'floating' | 'page';
   onUnknownQuestion?: (question: string) => void;
   onSearchResult?: (query: string, result: SearchResult) => void;
   onTicketCreated?: (ticket: Ticket) => void;
@@ -44,11 +45,13 @@ export function ChatbotWidget({
   onUnknownQuestion,
   onSearchResult,
   onTicketCreated,
+  variant = 'floating',
 }: ChatbotWidgetProps) {
   const [activeView, setActiveView] = useState<WidgetView>('home');
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null);
   const [unknownQuestions, setUnknownQuestions] = useState<string[]>([]);
   const [contactRequest, setContactRequest] = useState<ContactRequestContext | null>(null);
+  const [selectedIntentId, setSelectedIntentId] = useState<string>();
   const initialMessages = useMemo(
     () => [createMessage('bot', botConfig.bot.greeting)],
     [botConfig.bot.greeting],
@@ -61,6 +64,7 @@ export function ChatbotWidget({
     setSelectedNotice(null);
     setUnknownQuestions([]);
     setContactRequest(null);
+    setSelectedIntentId(undefined);
   }, [initialMessages]);
 
   useEffect(() => {
@@ -80,6 +84,7 @@ export function ChatbotWidget({
   };
 
   const handleQuestionSelect = (item: KnowledgeItem) => {
+    if (item.intentId) setSelectedIntentId(item.intentId);
     setActiveView('chat');
     setMessages((current) => [
       ...current,
@@ -90,6 +95,22 @@ export function ChatbotWidget({
         handoffCta: Boolean(item.handoffRecommended),
       }),
     ]);
+  };
+
+  const handleJourneySelect = (journey: CustomerJourney) => {
+    setSelectedIntentId(journey.intentIds[0]);
+    const item = findKnowledgeById(botConfig, journey.knowledgeIds[0]);
+    if (item) {
+      handleQuestionSelect(item);
+      return;
+    }
+    setActiveView('chat');
+  };
+
+  const handleClarificationSelect = (option: ClarificationOption) => {
+    setSelectedIntentId(option.intentId);
+    const item = option.knowledgeId ? findKnowledgeById(botConfig, option.knowledgeId) : undefined;
+    if (item) handleQuestionSelect(item);
   };
 
   const openContactRequest = (
@@ -126,13 +147,23 @@ export function ChatbotWidget({
   };
 
   const handleSubmit = (query: string) => {
-    const result = searchKnowledge(query, botConfig);
+    const result = searchKnowledge(query, botConfig, { intentId: selectedIntentId });
     const nextMessages: ChatMessage[] = [createMessage('user', query)];
     const event = createConversationEvent(botConfig.bot.id, query, result);
     appendConversationEvent(event);
     onSearchResult?.(query, result);
 
-    if (result.status === 'answer' && result.item) {
+    const clarification = (result.status === 'fallback' || result.status === 'suggestions')
+      ? botConfig.search?.clarificationFlows?.find((flow) => flow.triggerTerms.some((term) => query.includes(term)))
+      : undefined;
+
+    if (clarification) {
+      nextMessages.push(createMessage('bot', clarification.prompt, {
+        clarificationOptions: clarification.options,
+        confidence: 'medium',
+        id: event.id,
+      }));
+    } else if (result.status === 'answer' && result.item) {
       const items = result.items ?? [result.item];
       const answerText = items.map((item) => item.answer).join('\n\n');
       nextMessages.push(
@@ -204,7 +235,7 @@ export function ChatbotWidget({
 
   return (
     <section
-      className={isOpen ? 'chatplate-widget is-open' : 'chatplate-widget'}
+      className={`chatplate-widget chatplate-widget--${variant}${isOpen ? ' is-open' : ''}`}
       style={{ '--chatplate-primary': botConfig.theme.primaryColor } as CSSProperties}
       aria-label={`${botConfig.bot.name} 챗봇 위젯`}
       aria-hidden={!isOpen}
@@ -222,9 +253,11 @@ export function ChatbotWidget({
         <button className="icon-button" type="button" aria-label="대화 초기화" onClick={resetConversation}>
           <RotateCcw size={18} aria-hidden="true" />
         </button>
-        <button className="icon-button" type="button" aria-label="챗봇 닫기" onClick={onClose}>
-          <X size={19} aria-hidden="true" />
-        </button>
+        {variant === 'floating' ? (
+          <button className="icon-button" type="button" aria-label="챗봇 닫기" onClick={onClose}>
+            <X size={19} aria-hidden="true" />
+          </button>
+        ) : <span />}
       </header>
 
       <div className="widget-body">
@@ -235,6 +268,7 @@ export function ChatbotWidget({
             onStartChat={() => setActiveView('chat')}
             onOpenNotice={handleNoticeOpen}
             onQuestionSelect={handleQuestionSelect}
+            onJourneySelect={handleJourneySelect}
           />
         ) : null}
         {activeView === 'chat' ? (
@@ -262,6 +296,7 @@ export function ChatbotWidget({
             onRequestHandoff={handleRequestHandoff}
             onCancelContactRequest={() => setContactRequest(null)}
             onTicketCreated={handleTicketCreated}
+            onClarificationSelect={handleClarificationSelect}
           />
         ) : null}
         {activeView === 'conversations' ? (

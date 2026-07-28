@@ -8,6 +8,7 @@ export interface QueryAnalysis {
   normalized: string;
   compact: string;
   tokens: string[];
+  synonymTokens: string[];
   intents: string[];
 }
 
@@ -15,7 +16,7 @@ function stemToken(token: string): string {
   return token.replace(PARTICLES, '');
 }
 
-export function analyzeQuery(query: string): QueryAnalysis {
+export function analyzeQuery(query: string, synonymGroups: { terms: string[] }[] = []): QueryAnalysis {
   const normalized = normalizeText(query);
   const tokens = normalized
     .split(' ')
@@ -25,12 +26,17 @@ export function analyzeQuery(query: string): QueryAnalysis {
     .split(CONNECTOR_PATTERN)
     .map((intent) => intent.trim())
     .filter((intent) => intent.length >= 2);
+  const synonymTokens = synonymGroups
+    .filter((group) => group.terms.some((term) => normalized.includes(normalizeText(term))))
+    .flatMap((group) => group.terms.map((term) => normalizeText(term)))
+    .filter((term) => term && !tokens.includes(term));
 
   return {
     original: query,
     normalized,
     compact: normalized.replace(/\s/g, ''),
     tokens,
+    synonymTokens: [...new Set(synonymTokens)],
     intents: intents.length > 1 ? intents : [normalized],
   };
 }

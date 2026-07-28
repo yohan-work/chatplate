@@ -22,6 +22,49 @@
     "channelId": "kakao",
     "label": "카카오 상담 채널 보기"
   },
+  "customerJourneys": [
+    {
+      "id": "learning-concern",
+      "title": "학습 고민 상담",
+      "description": "우리 아이에게 맞을지, 어떤 도움을 받을 수 있을지 알아보세요.",
+      "knowledgeIds": ["consultation-002", "program-001", "program-002"],
+      "intentIds": ["fit", "program"]
+    },
+    {
+      "id": "coaching-method",
+      "title": "코칭 방식 알아보기",
+      "description": "코칭 진행 방식과 상담 전 확인할 내용을 안내합니다.",
+      "knowledgeIds": ["intro-001", "program-001", "consultation-001"],
+      "intentIds": ["intro", "program"]
+    },
+    {
+      "id": "pricing-enrollment",
+      "title": "비용·등록 문의",
+      "description": "비용, 등록, 변경과 환불 관련 최신 안내를 확인하세요.",
+      "knowledgeIds": ["policy-001", "policy-002", "consultation-001"],
+      "intentIds": ["pricing", "policy"]
+    }
+  ],
+  "search": {
+    "synonymGroups": [
+      { "id": "consultation", "terms": ["상담", "문의", "카톡", "카카오", "예약"] },
+      { "id": "pricing", "terms": ["비용", "가격", "수강료", "요금", "얼마"] },
+      { "id": "enrollment", "terms": ["등록", "신청", "접수", "시작"] },
+      { "id": "study", "terms": ["공부", "학습", "성적", "관리", "습관"] }
+    ],
+    "clarificationFlows": [
+      {
+        "id": "study-concern",
+        "triggerTerms": ["공부를 못", "성적", "학습 고민"],
+        "prompt": "현재 가장 큰 학습 고민을 골라 주세요.",
+        "options": [
+          { "label": "우리 아이에게 맞을지 궁금해요", "intentId": "fit", "knowledgeId": "consultation-002" },
+          { "label": "코칭 방식이 궁금해요", "intentId": "program", "knowledgeId": "program-001" },
+          { "label": "상담을 신청하고 싶어요", "intentId": "consultation", "knowledgeId": "consultation-001" }
+        ]
+      }
+    ]
+  },
   "notices": [],
   "contactChannels": [
     {
@@ -42,8 +85,10 @@
   "categories": [
     { "id": "intro", "name": "코칭 소개" },
     { "id": "consultation", "name": "상담 신청" },
+    { "id": "fit", "name": "적합성 및 학습 고민" },
     { "id": "program", "name": "코칭 안내" },
-    { "id": "policy", "name": "등록 및 정책" }
+    { "id": "policy", "name": "등록 및 정책" },
+    { "id": "privacy", "name": "개인정보 및 안전" }
   ],
   "quickReplies": [
     { "label": "코치 마이:웨이는 어떤 곳인가요?", "knowledgeId": "intro-001" },
@@ -58,6 +103,7 @@
       "question": "코치 마이:웨이는 어떤 곳인가요?",
       "keywords": ["코치마이웨이", "코치 마이웨이", "마이웨이", "소개", "학습코칭", "프리미엄"],
       "aliases": ["어떤 학원인가요?", "어떤 곳이에요?", "코치 마이웨이가 뭐예요?", "서비스 소개해 주세요"],
+      "intentId": "intro",
       "tags": ["1:1", "학습"],
       "answer": "코치 마이:웨이는 1:1 프리미엄 학습 코칭을 안내하는 교육 브랜드입니다. 구체적인 코칭 대상과 방식은 상담에서 학생 상황에 맞춰 안내해 드립니다.",
       "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
@@ -73,6 +119,7 @@
       "question": "상담은 어떻게 신청하나요?",
       "keywords": ["상담", "신청", "문의", "예약", "카카오", "카톡"],
       "aliases": ["상담 받고 싶어요", "상담 신청 방법", "문의는 어디로 하나요?", "카톡 상담 가능한가요?"],
+      "intentId": "consultation",
       "answer": "카카오 상담 채널에서 상담을 신청해 주세요. 학생의 학년, 현재 고민, 상담 희망 내용을 간단히 남기면 더 정확한 안내에 도움이 됩니다.",
       "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
       "relatedIds": ["consultation-002", "privacy-001"],
@@ -87,6 +134,7 @@
       "question": "우리 아이에게 맞을지 궁금해요.",
       "keywords": ["우리 아이", "맞을지", "적합", "추천", "고민", "학습"],
       "aliases": ["저에게 맞나요?", "아이에게 맞는지 알고 싶어요", "우리 아이에게 맞는지 상담 받고 싶어요", "상담 전에 확인하고 싶어요", "추천 대상이 궁금해요"],
+      "intentId": "fit",
       "answer": "학생마다 학습 목표와 현재 어려움이 다르므로, 적합 여부는 상담에서 확인하는 것이 가장 정확합니다. 현재 학습 고민을 간단히 알려 주세요.",
       "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
       "relatedIds": ["consultation-001", "program-001"],
@@ -101,6 +149,7 @@
       "question": "코칭은 어떻게 진행되나요?",
       "keywords": ["코칭", "진행", "수업", "방식", "관리", "커리큘럼"],
       "aliases": ["수업 방식이 궁금해요", "어떻게 공부를 도와주나요?", "관리 방식 알려주세요", "커리큘럼이 있나요?"],
+      "intentId": "program",
       "answer": "코칭 진행 방식은 학생의 목표와 상담 결과에 따라 달라질 수 있습니다. 현재 제공 가능한 방식과 상세 과정은 카카오 상담에서 확인해 주세요.",
       "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
       "relatedIds": ["consultation-002", "program-002"],
@@ -116,6 +165,7 @@
       "question": "어떤 학년과 과목을 코칭하나요?",
       "keywords": ["학년", "과목", "중학생", "고등학생", "초등학생", "수능"],
       "aliases": ["중학생도 가능한가요?", "고등학생 대상인가요?", "과목은 무엇을 하나요?", "수능 준비도 되나요?"],
+      "intentId": "program",
       "answer": "대상 학년과 과목별 안내는 운영 상황에 따라 달라질 수 있습니다. 희망 학년과 과목을 카카오 상담 채널에 남겨 주시면 확인 후 안내해 드립니다.",
       "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
       "relatedIds": ["consultation-002", "program-001"],
@@ -131,6 +181,7 @@
       "question": "비용이 궁금해요.",
       "keywords": ["비용", "가격", "수강료", "요금", "금액", "결제"],
       "aliases": ["얼마예요?", "수강료 알려주세요", "가격표 있나요?", "결제 방법이 궁금해요"],
+      "intentId": "pricing",
       "answer": "비용은 코칭 방식과 상담 내용에 따라 달라질 수 있어 이곳에서 확정 금액을 안내하지 않습니다. 카카오 상담 채널에서 최신 안내를 확인해 주세요.",
       "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
       "relatedIds": ["policy-002", "consultation-001"],
@@ -146,6 +197,7 @@
       "question": "등록, 변경, 환불은 어떻게 하나요?",
       "keywords": ["등록", "변경", "환불", "취소", "해지", "약관"],
       "aliases": ["등록 절차가 궁금해요", "환불 가능한가요?", "수업을 바꿀 수 있나요?", "취소하고 싶어요"],
+      "intentId": "policy",
       "answer": "등록·변경·환불 기준은 신청한 프로그램과 시점에 따라 확인이 필요합니다. 카카오 상담 채널로 문의해 최신 기준을 안내받아 주세요.",
       "buttons": [{ "label": "카카오 상담 채널 보기", "type": "url", "value": "https://linktr.ee/coachmyway" }],
       "relatedIds": ["policy-001", "consultation-001"],

@@ -1,4 +1,4 @@
-import type { ChatMessage, KnowledgeItem } from '../../types/chatbot';
+import type { ChatMessage, ClarificationOption, KnowledgeItem } from '../../types/chatbot';
 import { ActionButton } from '../common/ActionButton';
 
 interface ChatBubbleProps {
@@ -8,9 +8,10 @@ interface ChatBubbleProps {
   onFeedback: (messageId: string, feedback: 'helpful' | 'not-helpful') => void;
   onRequestHandoff: (message: ChatMessage) => void;
   handoffLabel?: string;
+  onClarificationSelect: (option: ClarificationOption) => void;
 }
 
-export function ChatBubble({ message, onQuestionSelect, onAction, onFeedback, onRequestHandoff, handoffLabel }: ChatBubbleProps) {
+export function ChatBubble({ message, onQuestionSelect, onAction, onFeedback, onRequestHandoff, handoffLabel, onClarificationSelect }: ChatBubbleProps) {
   const canGiveFeedback = message.role === 'bot' && Boolean(message.confidence);
 
   return (
@@ -28,6 +29,15 @@ export function ChatBubble({ message, onQuestionSelect, onAction, onFeedback, on
           {message.suggestions.map((item) => (
             <button key={item.id} type="button" onClick={() => onQuestionSelect(item)}>
               {item.question}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {message.clarificationOptions?.length ? (
+        <div className="suggestion-list">
+          {message.clarificationOptions.map((option) => (
+            <button key={option.label} type="button" onClick={() => onClarificationSelect(option)}>
+              {option.label}
             </button>
           ))}
         </div>

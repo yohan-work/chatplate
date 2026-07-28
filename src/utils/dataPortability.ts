@@ -41,6 +41,9 @@ export function validateBotConfig(value: unknown): ValidationResult {
   if (typeof theme.primaryColor !== 'string') errors.push('Missing theme.primaryColor');
   if (typeof theme.homeTitle !== 'string') errors.push('Missing theme.homeTitle');
 
+  if (value.customerJourneys !== undefined && !Array.isArray(value.customerJourneys)) errors.push('customerJourneys must be an array when provided');
+  if (value.search !== undefined && !isRecord(value.search)) errors.push('search must be an object when provided');
+
   return { ok: errors.length === 0, errors };
 }
 

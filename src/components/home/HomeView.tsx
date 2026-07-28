@@ -1,5 +1,5 @@
 import { Bell, ChevronRight, Mail, MapPin, MessageCircle, Phone } from 'lucide-react';
-import type { BotConfig, ContactChannel, KnowledgeItem, Notice } from '../../types/chatbot';
+import type { BotConfig, ContactChannel, CustomerJourney, KnowledgeItem, Notice } from '../../types/chatbot';
 import { ActionButton } from '../common/ActionButton';
 import { findKnowledgeById } from '../../engine/searchKnowledge';
 
@@ -9,6 +9,7 @@ interface HomeViewProps {
   onStartChat: () => void;
   onOpenNotice: (notice: Notice) => void;
   onQuestionSelect: (item: KnowledgeItem) => void;
+  onJourneySelect: (journey: CustomerJourney) => void;
 }
 
 function ChannelIcon({ channel }: { channel: ContactChannel }) {
@@ -18,7 +19,7 @@ function ChannelIcon({ channel }: { channel: ContactChannel }) {
   return <MessageCircle size={18} aria-hidden="true" />;
 }
 
-export function HomeView({ botConfig, unreadCount, onStartChat, onOpenNotice, onQuestionSelect }: HomeViewProps) {
+export function HomeView({ botConfig, unreadCount, onStartChat, onOpenNotice, onQuestionSelect, onJourneySelect }: HomeViewProps) {
   const primaryNotice = botConfig.notices[0];
   const unreadNotice = botConfig.notices.find((notice) => notice.unread) ?? primaryNotice;
 
@@ -32,6 +33,23 @@ export function HomeView({ botConfig, unreadCount, onStartChat, onOpenNotice, on
           <span>문의하기</span>
         </button>
       </section>
+
+      {botConfig.customerJourneys?.length ? (
+        <section className="panel-section journey-section">
+          <div className="section-title">
+            <h3>어떤 도움이 필요하신가요?</h3>
+          </div>
+          <div className="journey-list">
+            {botConfig.customerJourneys.map((journey) => (
+              <button className="journey-card" key={journey.id} type="button" onClick={() => onJourneySelect(journey)}>
+                <strong>{journey.title}</strong>
+                <span>{journey.description}</span>
+                <ChevronRight size={18} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {primaryNotice ? (
         <article className="notice-card">

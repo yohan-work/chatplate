@@ -1,5 +1,5 @@
 import { Clock } from 'lucide-react';
-import type { BotConfig, ChatMessage, KnowledgeItem, Ticket, TicketSource } from '../../types/chatbot';
+import type { BotConfig, ChatMessage, ClarificationOption, KnowledgeItem, Ticket, TicketSource } from '../../types/chatbot';
 import { findKnowledgeById } from '../../engine/searchKnowledge';
 import { Avatar } from '../common/Avatar';
 import { ChatBubble } from './ChatBubble';
@@ -24,6 +24,7 @@ interface ChatViewProps {
   onRequestHandoff: (message: ChatMessage) => void;
   onCancelContactRequest: () => void;
   onTicketCreated: (ticket: Ticket) => void;
+  onClarificationSelect: (option: ClarificationOption) => void;
 }
 
 export function ChatView({
@@ -37,6 +38,7 @@ export function ChatView({
   onRequestHandoff,
   onCancelContactRequest,
   onTicketCreated,
+  onClarificationSelect,
 }: ChatViewProps) {
   return (
     <div className="chat-view">
@@ -71,6 +73,7 @@ export function ChatView({
             onFeedback={onFeedback}
             onRequestHandoff={onRequestHandoff}
             handoffLabel={botConfig.handoff?.label}
+            onClarificationSelect={onClarificationSelect}
           />
         ))}
         {contactRequest ? (

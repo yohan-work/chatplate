@@ -12,6 +12,7 @@ function confidenceFor(score: number): SearchConfidence {
 
 export function decideSearchResult(ranked: RankedKnowledge[]): SearchResult {
   const top = ranked[0];
+  const second = ranked[1];
   const alternatives = ranked.slice(1, 4).map((entry) => entry.entry.item);
 
   if (!top) {
@@ -30,6 +31,20 @@ export function decideSearchResult(ranked: RankedKnowledge[]): SearchResult {
     .filter((entry) => entry.score >= MEDIUM_CONFIDENCE_THRESHOLD)
     .slice(0, 3)
     .map((entry) => entry.entry.item);
+
+  const isAmbiguous = Boolean(second && top.score >= MEDIUM_CONFIDENCE_THRESHOLD && second.score >= MEDIUM_CONFIDENCE_THRESHOLD && top.score - second.score < 12);
+
+  if (isAmbiguous) {
+    return {
+      status: 'suggestions',
+      confidence: 'medium',
+      score: top.score,
+      suggestions,
+      alternatives,
+      matchedFields: top.matchedFields,
+      debugScore: top.debugScore,
+    };
+  }
 
   if (confidence === 'high') {
     return {

@@ -2,6 +2,7 @@ import alfDemo from './alf-demo.json';
 import animalHospital from './animal-hospital.json';
 import cafe from './cafe.json';
 import coachMyway from './coach-myway.json';
+import { coachMywayDraftKnowledge } from './coach-myway-drafts';
 import lawOffice from './law-office.json';
 import type { BotConfig } from '../types/chatbot';
 
@@ -10,7 +11,10 @@ export const botConfigs: Record<string, BotConfig> = {
   'animal-hospital': animalHospital as BotConfig,
   'law-office': lawOffice as BotConfig,
   cafe: cafe as BotConfig,
-  'coach-myway': coachMyway as BotConfig,
+  'coach-myway': {
+    ...(coachMyway as BotConfig),
+    knowledge: [...(coachMyway as BotConfig).knowledge, ...coachMywayDraftKnowledge],
+  },
 };
 
 export const defaultBotId = 'coach-myway';
