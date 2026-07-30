@@ -1,19 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Bell,
   Bot,
   Clock,
   Inbox,
   ListChecks,
+  LogOut,
   MessageCircle,
   MessageSquareWarning,
   Plus,
   RotateCcw,
   Search,
+  Send,
   Settings,
   Sparkles,
   Trash2,
   Upload,
+  UserCheck,
 } from 'lucide-react';
 import { searchKnowledge } from '../../engine/searchKnowledge';
 import { evaluateSearchDataset, type EvaluationMetrics } from '../../engine/evaluateSearchDataset';
@@ -21,20 +24,20 @@ import { validateSmallTalkConfig } from '../../engine/resolveConversation';
 import { resolveSmallTalkConfig } from '../../data/smallTalkDefaults';
 import type {
   AdminPanelView,
+  AdminProfile,
   BotConfig,
   BotConfigMap,
   KnowledgeItem,
   Notice,
   QuickReply,
   SmallTalkRule,
-  Ticket,
-  TicketPriority,
-  TicketStatus,
+  SupportConversation,
+  SupportConversationBundle,
+  SupportInternalNote,
 } from '../../types/chatbot';
 import {
   createEmptyKnowledge,
   createEmptyNotice,
-  createKnowledgeFromTicket,
   createQuickReply,
   formatCommaList,
   parseCommaList,
@@ -42,7 +45,10 @@ import {
 } from '../../utils/adminBotConfig';
 import { clearConversationEvents, loadConversationEvents } from '../../utils/conversationEvents';
 import { conversationEventsToCsv, parseBotConfigJson, stringifyJson } from '../../utils/dataPortability';
-import { clearTickets, loadTickets, ticketsToCsv, ticketStatusLabel, updateTicket } from '../../utils/ticketStorage';
+import { clearTickets, loadTickets, ticketsToCsv } from '../../utils/ticketStorage';
+import { createClientMessageId, type ChatRepository } from '../../services/chatRepository';
+import { getChatRepository } from '../../services/getChatRepository';
+import { LocalChatRepository } from '../../services/localChatRepository';
 import { ChatbotLauncher } from '../widget/ChatbotLauncher';
 import { ChatbotWidget } from '../widget/ChatbotWidget';
 
@@ -110,6 +116,51 @@ function TextAreaField({
   );
 }
 
+function AdminLogin({
+  repository,
+  onAuthenticated,
+}: {
+  repository: ChatRepository;
+  onAuthenticated: (profile: AdminProfile) => void;
+}) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  return (
+    <main className="admin-login">
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          setIsSubmitting(true);
+          setError(undefined);
+          void repository.signInAdmin(email.trim(), password)
+            .then(onAuthenticated)
+            .catch((nextError: unknown) => {
+              setError(nextError instanceof Error ? nextError.message : '로그인하지 못했습니다.');
+            })
+            .finally(() => setIsSubmitting(false));
+        }}
+      >
+        <span className="admin-brand__mark"><Settings size={20} aria-hidden="true" /></span>
+        <h1>Chatplate Admin</h1>
+        <p>등록된 운영자 계정으로 로그인해 주세요.</p>
+        {error ? <div className="admin-callout admin-callout--error" role="alert">{error}</div> : null}
+        <label className="admin-field">
+          <span>이메일</span>
+          <input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
+        </label>
+        <label className="admin-field">
+          <span>비밀번호</span>
+          <input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} />
+        </label>
+        <button type="submit" disabled={isSubmitting}>{isSubmitting ? '로그인 중…' : '로그인'}</button>
+      </form>
+    </main>
+  );
+}
+
 function AdminSidebar({
   botConfigs,
   selectedBotId,
@@ -117,6 +168,8 @@ function AdminSidebar({
   onSelectBot,
   onChangeView,
   onResetBot,
+  admin,
+  onSignOut,
 }: {
   botConfigs: BotConfigMap;
   selectedBotId: string;
@@ -124,6 +177,8 @@ function AdminSidebar({
   onSelectBot: (botId: string) => void;
   onChangeView: (view: AdminPanelView) => void;
   onResetBot: () => void;
+  admin: AdminProfile;
+  onSignOut: () => void;
 }) {
   return (
     <aside className="admin-sidebar">
@@ -169,6 +224,13 @@ function AdminSidebar({
         <RotateCcw size={16} aria-hidden="true" />
         원본 데이터로 복원
       </button>
+      <div className="admin-account">
+        <span>{admin.displayName}</span>
+        <small>{admin.role === 'owner' ? '소유자' : '상담원'}</small>
+        <button type="button" onClick={onSignOut} aria-label="관리자 로그아웃">
+          <LogOut size={15} aria-hidden="true" />
+        </button>
+      </div>
     </aside>
   );
 }
@@ -914,148 +976,271 @@ function DataPortabilityPanel({
 
 function TicketInboxPanel({
   config,
-  ticketVersion,
-  onTicketVersionChange,
+  repository,
+  admin,
   onUpdate,
 }: {
   config: BotConfig;
-  ticketVersion: number;
-  onTicketVersionChange: () => void;
+  repository: ChatRepository;
+  admin: AdminProfile;
   onUpdate: (updater: (config: BotConfig) => BotConfig) => void;
 }) {
-  const [selectedTicketId, setSelectedTicketId] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | TicketStatus>('all');
-  const tickets = useMemo(
-    () => loadTickets().filter((ticket) => ticket.botId === config.bot.id),
-    [config.bot.id, ticketVersion],
-  );
-  const filteredTickets = statusFilter === 'all' ? tickets : tickets.filter((ticket) => ticket.status === statusFilter);
-  const selectedTicket = filteredTickets.find((ticket) => ticket.id === selectedTicketId) ?? filteredTickets[0];
+  const [conversations, setConversations] = useState<SupportConversation[]>([]);
+  const [selectedConversationId, setSelectedConversationId] = useState('');
+  const [bundle, setBundle] = useState<SupportConversationBundle>();
+  const [notes, setNotes] = useState<SupportInternalNote[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | SupportConversation['status']>('all');
+  const [reply, setReply] = useState('');
+  const [note, setNote] = useState('');
+  const [error, setError] = useState<string>();
+  const [isWorking, setIsWorking] = useState(false);
+
+  const refreshInbox = useCallback(async () => {
+    const next = (await repository.listConversations(config.bot.id))
+      .filter((conversation) => conversation.status !== 'bot_active');
+    setConversations(next);
+    setSelectedConversationId((current) => current || next[0]?.id || '');
+  }, [config.bot.id, repository]);
+
+  const refreshSelected = useCallback(async (conversationId: string) => {
+    const [nextBundle, nextNotes] = await Promise.all([
+      repository.loadConversation(conversationId),
+      repository.listInternalNotes(conversationId),
+    ]);
+    setBundle(nextBundle ?? undefined);
+    setNotes(nextNotes);
+  }, [repository]);
 
   useEffect(() => {
-    if (!selectedTicket && selectedTicketId) setSelectedTicketId('');
-  }, [selectedTicket, selectedTicketId]);
-
-  const patchTicket = (ticket: Ticket, patch: Partial<Pick<Ticket, 'status' | 'priority' | 'adminMemo'>>) => {
-    updateTicket(ticket.id, patch);
-    onTicketVersionChange();
-  };
-
-  const createFaqDraft = (ticket: Ticket) => {
-    const item = createKnowledgeFromTicket(ticket, config.categories[0]?.id ?? 'general');
-    onUpdate((current) => ({ ...current, knowledge: [item, ...current.knowledge] }));
-    patchTicket(ticket, {
-      status: ticket.status === 'new' ? 'inProgress' : ticket.status,
-      adminMemo: [ticket.adminMemo, `FAQ 초안 생성: ${item.id}`].filter(Boolean).join('\n'),
+    void refreshInbox().catch((nextError: unknown) => {
+      setError(nextError instanceof Error ? nextError.message : '상담 목록을 불러오지 못했습니다.');
     });
+    return repository.subscribe({ botId: config.bot.id }, () => {
+      void refreshInbox().catch(() => undefined);
+    });
+  }, [config.bot.id, refreshInbox, repository]);
+
+  useEffect(() => {
+    if (!selectedConversationId) {
+      setBundle(undefined);
+      return;
+    }
+    void Promise.all([
+      refreshSelected(selectedConversationId),
+      repository.markRead(selectedConversationId, 'admin'),
+    ]).catch((nextError: unknown) => {
+      setError(nextError instanceof Error ? nextError.message : '상담 내용을 불러오지 못했습니다.');
+    });
+    return repository.subscribe({ conversationId: selectedConversationId }, () => {
+      void refreshSelected(selectedConversationId).catch(() => undefined);
+    });
+  }, [refreshSelected, repository, selectedConversationId]);
+
+  const filteredConversations = statusFilter === 'all'
+    ? conversations
+    : conversations.filter((conversation) => conversation.status === statusFilter);
+  const selectedConversation = bundle?.conversation;
+  const statusCounts = conversations.reduce<Record<SupportConversation['status'], number>>(
+    (counts, conversation) => ({ ...counts, [conversation.status]: counts[conversation.status] + 1 }),
+    { bot_active: 0, waiting: 0, human_active: 0, resolved: 0 },
+  );
+  const statusLabel = (status: SupportConversation['status']) => {
+    if (status === 'waiting') return '상담 대기';
+    if (status === 'human_active') return '상담 중';
+    if (status === 'resolved') return '완료';
+    return '자동 안내';
+  };
+  const canReply = selectedConversation?.status === 'human_active' &&
+    selectedConversation.assignedTo === admin.id;
+
+  const runAction = async (action: () => Promise<unknown>) => {
+    setIsWorking(true);
+    setError(undefined);
+    try {
+      await action();
+      await Promise.all([
+        refreshInbox(),
+        selectedConversationId ? refreshSelected(selectedConversationId) : Promise.resolve(),
+      ]);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : '상담 작업을 완료하지 못했습니다.');
+    } finally {
+      setIsWorking(false);
+    }
   };
 
-  const statusCounts = tickets.reduce<Record<TicketStatus, number>>(
-    (counts, ticket) => ({ ...counts, [ticket.status]: counts[ticket.status] + 1 }),
-    { new: 0, inProgress: 0, resolved: 0, onHold: 0 },
-  );
+  const createFaqDraft = () => {
+    if (!bundle) return;
+    const visitorMessages = bundle.messages.filter((message) => message.sender === 'visitor');
+    const question = visitorMessages[0]?.text;
+    if (!question) {
+      setError('FAQ로 만들 고객 질문이 없습니다.');
+      return;
+    }
+    const item = {
+      ...createEmptyKnowledge(config.categories[0]?.id ?? 'general'),
+      question,
+      aliases: visitorMessages.slice(1).map((message) => message.text),
+      source: `conversation:${bundle.conversation.id}`,
+      status: 'draft' as const,
+    };
+    onUpdate((current) => ({ ...current, knowledge: [item, ...current.knowledge] }));
+    setNote(`FAQ 초안 생성: ${item.id}`);
+  };
 
   return (
     <section className="admin-panel">
-      <PanelHeader title="상담 문의함" description="챗봇이 해결하지 못한 질문과 상담 요청을 티켓으로 처리합니다." />
+      <PanelHeader title="채팅 상담함" description="자동응대에서 인계된 대화를 담당자가 이어서 답변합니다." />
+      {error ? <p className="admin-callout admin-callout--error" role="alert">{error}</p> : null}
 
       <div className="ticket-summary">
         <button className={statusFilter === 'all' ? 'is-active' : ''} type="button" onClick={() => setStatusFilter('all')}>
-          전체 <strong>{tickets.length}</strong>
+          전체 <strong>{conversations.length}</strong>
         </button>
-        {(['new', 'inProgress', 'resolved', 'onHold'] as TicketStatus[]).map((status) => (
+        {(['waiting', 'human_active', 'resolved'] as SupportConversation['status'][]).map((status) => (
           <button className={statusFilter === status ? 'is-active' : ''} key={status} type="button" onClick={() => setStatusFilter(status)}>
-            {ticketStatusLabel(status)} <strong>{statusCounts[status]}</strong>
+            {statusLabel(status)} <strong>{statusCounts[status]}</strong>
           </button>
         ))}
       </div>
 
       <div className="admin-list-layout ticket-layout">
         <div className="admin-item-list">
-          {filteredTickets.map((ticket) => (
+          {filteredConversations.map((conversation) => (
             <button
-              key={ticket.id}
-              className={selectedTicket?.id === ticket.id ? 'admin-list-item ticket-list-item is-active' : 'admin-list-item ticket-list-item'}
+              key={conversation.id}
+              className={selectedConversationId === conversation.id ? 'admin-list-item ticket-list-item is-active' : 'admin-list-item ticket-list-item'}
               type="button"
-              onClick={() => setSelectedTicketId(ticket.id)}
+              onClick={() => setSelectedConversationId(conversation.id)}
             >
-              <span className={`ticket-status ticket-status--${ticket.status}`}>{ticketStatusLabel(ticket.status)}</span>
-              <strong>{ticket.originalQuestion || ticket.message}</strong>
-              <span>{ticket.name} · {ticket.contact}</span>
+              <span className={`ticket-status ticket-status--${conversation.status}`}>{statusLabel(conversation.status)}</span>
+              <strong>{conversation.contact?.name ?? '익명 방문자'}</strong>
+              <span>
+                {conversation.assignedName ?? '미배정'} · {new Date(conversation.lastMessageAt).toLocaleString('ko-KR')}
+              </span>
+              {conversation.unreadForAdmins > 0 ? <b className="admin-unread">{conversation.unreadForAdmins}</b> : null}
             </button>
           ))}
-          {filteredTickets.length === 0 ? <EmptyState text="조건에 맞는 상담 티켓이 없습니다." /> : null}
+          {filteredConversations.length === 0 ? <EmptyState text="조건에 맞는 상담 대화가 없습니다." /> : null}
         </div>
 
-        {selectedTicket ? (
+        {selectedConversation && bundle ? (
           <div className="admin-editor-card ticket-detail">
             <div className="ticket-detail__top">
               <div>
-                <span>{selectedTicket.id}</span>
-                <strong>{selectedTicket.originalQuestion || selectedTicket.message}</strong>
+                <span>{selectedConversation.id}</span>
+                <strong>{selectedConversation.contact?.name ?? '익명 방문자'} 상담</strong>
               </div>
-              <span className={`ticket-status ticket-status--${selectedTicket.status}`}>{ticketStatusLabel(selectedTicket.status)}</span>
+              <span className={`ticket-status ticket-status--${selectedConversation.status}`}>{statusLabel(selectedConversation.status)}</span>
             </div>
 
             <div className="ticket-meta-grid">
               <div>
-                <span>고객</span>
-                <strong>{selectedTicket.name}</strong>
-              </div>
-              <div>
                 <span>연락처</span>
-                <strong>{selectedTicket.contact}</strong>
+                <strong>{selectedConversation.contact?.contact ?? '인계 전'}</strong>
               </div>
               <div>
-                <span>유입</span>
-                <strong>{selectedTicket.source}</strong>
+                <span>담당자</span>
+                <strong>{selectedConversation.assignedName ?? '미배정'}</strong>
+              </div>
+              <div>
+                <span>인계 사유</span>
+                <strong>{selectedConversation.handoffReason ?? '-'}</strong>
               </div>
               <div>
                 <span>생성</span>
-                <strong>{new Date(selectedTicket.createdAt).toLocaleString('ko-KR')}</strong>
+                <strong>{new Date(selectedConversation.createdAt).toLocaleString('ko-KR')}</strong>
               </div>
             </div>
 
-            <TextAreaField label="문의 내용" value={selectedTicket.message} rows={4} readOnly onChange={() => undefined} />
-
-            <div className="admin-form-grid">
-              <label className="admin-field">
-                <span>상태</span>
-                <select value={selectedTicket.status} onChange={(event) => patchTicket(selectedTicket, { status: event.target.value as TicketStatus })}>
-                  <option value="new">신규</option>
-                  <option value="inProgress">확인 중</option>
-                  <option value="resolved">답변 완료</option>
-                  <option value="onHold">보류</option>
-                </select>
-              </label>
-              <label className="admin-field">
-                <span>우선순위</span>
-                <select value={selectedTicket.priority} onChange={(event) => patchTicket(selectedTicket, { priority: event.target.value as TicketPriority })}>
-                  <option value="low">낮음</option>
-                  <option value="normal">보통</option>
-                  <option value="high">높음</option>
-                </select>
-              </label>
+            <div className="support-thread" aria-live="polite">
+              {bundle.messages.map((message) => (
+                <article className={`support-thread__message support-thread__message--${message.sender}`} key={message.id}>
+                  <span>{message.senderName ?? (message.sender === 'visitor' ? '고객' : message.sender === 'bot' ? '자동 안내' : '시스템')}</span>
+                  <p>{message.text}</p>
+                  <time>{new Date(message.createdAt).toLocaleString('ko-KR')}</time>
+                </article>
+              ))}
             </div>
 
-            <TextAreaField label="관리자 메모" value={selectedTicket.adminMemo} rows={4} onChange={(value) => patchTicket(selectedTicket, { adminMemo: value })} />
+            <div className="support-actions">
+              {!selectedConversation.assignedTo && selectedConversation.status === 'waiting' ? (
+                <button
+                  className="admin-add-button"
+                  type="button"
+                  disabled={isWorking}
+                  onClick={() => void runAction(() => repository.claimConversation(selectedConversation.id, admin))}
+                >
+                  <UserCheck size={15} aria-hidden="true" /> 담당하기
+                </button>
+              ) : null}
+              {selectedConversation.status === 'human_active' ? (
+                <button
+                  type="button"
+                  disabled={isWorking || (!canReply && admin.role !== 'owner')}
+                  onClick={() => void runAction(() => repository.resolveConversation(selectedConversation.id))}
+                >
+                  상담 완료
+                </button>
+              ) : null}
+            </div>
 
-            {selectedTicket.matchedKnowledgeIds.length ? (
-              <div className="ticket-related">
-                <strong>매칭 FAQ</strong>
-                {selectedTicket.matchedKnowledgeIds.map((knowledgeId) => (
-                  <span key={knowledgeId}>{config.knowledge.find((item) => item.id === knowledgeId)?.question ?? knowledgeId}</span>
-                ))}
+            <form
+              className="support-reply"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!reply.trim() || !selectedConversation) return;
+                const body = reply.trim();
+                setReply('');
+                void runAction(() => repository.appendMessage({
+                  conversationId: selectedConversation.id,
+                  clientId: createClientMessageId('operator'),
+                  sender: 'operator',
+                  senderId: admin.id,
+                  senderName: admin.displayName,
+                  text: body,
+                }));
+              }}
+            >
+              <textarea
+                value={reply}
+                rows={3}
+                disabled={!canReply || isWorking}
+                placeholder={canReply ? '고객에게 보낼 답변을 입력하세요.' : '담당하기 후 답변할 수 있습니다.'}
+                onChange={(event) => setReply(event.target.value)}
+              />
+              <button type="submit" disabled={!canReply || !reply.trim() || isWorking}>
+                <Send size={15} aria-hidden="true" /> 답변 보내기
+              </button>
+            </form>
+
+            <section className="support-notes">
+              <strong>내부 메모</strong>
+              {notes.map((entry) => (
+                <p key={entry.id}><b>{entry.authorName}</b> {entry.text}</p>
+              ))}
+              <div>
+                <input value={note} placeholder="고객에게 보이지 않는 메모" onChange={(event) => setNote(event.target.value)} />
+                <button
+                  type="button"
+                  disabled={!note.trim() || isWorking}
+                  onClick={() => {
+                    const body = note.trim();
+                    setNote('');
+                    void runAction(() => repository.appendInternalNote(selectedConversation.id, admin, body));
+                  }}
+                >
+                  메모 저장
+                </button>
               </div>
-            ) : null}
+            </section>
 
-            <button className="admin-add-button" type="button" onClick={() => createFaqDraft(selectedTicket)}>
-              <Plus size={15} aria-hidden="true" />
-              FAQ 초안 생성
+            <button className="admin-add-button" type="button" onClick={createFaqDraft}>
+              <Plus size={15} aria-hidden="true" /> FAQ 초안 생성
             </button>
           </div>
         ) : (
-          <EmptyState text="상담 티켓이 없습니다. 사용자 챗봇에서 상담 요청이 접수되면 여기에 표시됩니다." />
+          <EmptyState text="상담 대화를 선택해 주세요." />
         )}
       </div>
     </section>
@@ -1099,8 +1284,8 @@ function renderActivePanel(
   unknownQuestions: string[],
   botConfigs: BotConfigMap,
   selectedBotId: string,
-  ticketVersion: number,
-  onTicketVersionChange: () => void,
+  repository: ChatRepository,
+  admin: AdminProfile,
   onUpdate: (updater: (config: BotConfig) => BotConfig) => void,
   onReplaceBotConfigs: (configs: BotConfigMap) => void,
 ) {
@@ -1111,7 +1296,7 @@ function renderActivePanel(
   if (activeView === 'quickReplies') return <QuickReplyEditor config={config} onUpdate={onUpdate} />;
   if (activeView === 'smallTalk') return <SmallTalkEditor config={config} onUpdate={onUpdate} />;
   if (activeView === 'quality') return <SearchQualityPanel config={config} unknownQuestions={unknownQuestions} onUpdate={onUpdate} />;
-  if (activeView === 'tickets') return <TicketInboxPanel config={config} ticketVersion={ticketVersion} onTicketVersionChange={onTicketVersionChange} onUpdate={onUpdate} />;
+  if (activeView === 'tickets') return <TicketInboxPanel config={config} repository={repository} admin={admin} onUpdate={onUpdate} />;
   if (activeView === 'data') return <DataPortabilityPanel botConfigs={botConfigs} selectedBotId={selectedBotId} onReplaceBotConfigs={onReplaceBotConfigs} />;
   return <UnknownQuestionsPanel questions={unknownQuestions} />;
 }
@@ -1128,9 +1313,29 @@ export function AdminWorkspace({
 }: AdminWorkspaceProps) {
   const [activeView, setActiveView] = useState<AdminPanelView>('bot');
   const [isPreviewOpen, setIsPreviewOpen] = useState(true);
-  const [ticketVersion, setTicketVersion] = useState(0);
+  const repository = useMemo(() => getChatRepository('admin'), []);
+  const previewRepository = useMemo(() => {
+    const values = new Map<string, string>();
+    return new LocalChatRepository({
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => {
+        values.set(key, value);
+      },
+    });
+  }, []);
+  const [admin, setAdmin] = useState<AdminProfile | null>();
+  const [authError, setAuthError] = useState<string>();
   const selectedConfig = botConfigs[selectedBotId];
   const unreadCount = selectedConfig.notices.filter((notice) => notice.unread).length;
+
+  useEffect(() => {
+    void repository.getCurrentAdmin()
+      .then(setAdmin)
+      .catch((error: unknown) => {
+        setAuthError(error instanceof Error ? error.message : '관리자 세션을 확인하지 못했습니다.');
+        setAdmin(null);
+      });
+  }, [repository]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1100px)');
@@ -1141,6 +1346,13 @@ export function AdminWorkspace({
     return () => mediaQuery.removeEventListener('change', syncPreviewState);
   }, []);
 
+  if (admin === undefined) {
+    return <main className="admin-login"><p>{authError ?? '관리자 세션을 확인하고 있습니다…'}</p></main>;
+  }
+  if (admin === null) {
+    return <AdminLogin repository={repository} onAuthenticated={setAdmin} />;
+  }
+
   return (
     <main className="admin-workspace">
       <AdminSidebar
@@ -1150,6 +1362,10 @@ export function AdminWorkspace({
         onSelectBot={onSelectBot}
         onChangeView={setActiveView}
         onResetBot={onResetBot}
+        admin={admin}
+        onSignOut={() => {
+          void repository.signOutAdmin().finally(() => setAdmin(null));
+        }}
       />
 
       <div className="admin-content">
@@ -1159,8 +1375,8 @@ export function AdminWorkspace({
           unknownQuestions,
           botConfigs,
           selectedBotId,
-          ticketVersion,
-          () => setTicketVersion((current) => current + 1),
+          repository,
+          admin,
           onUpdateBotConfig,
           onReplaceBotConfigs,
         )}
@@ -1185,7 +1401,7 @@ export function AdminWorkspace({
             isOpen={isPreviewOpen}
             onClose={() => setIsPreviewOpen(false)}
             onUnknownQuestion={onUnknownQuestion}
-            onTicketCreated={() => setTicketVersion((current) => current + 1)}
+            chatRepository={previewRepository}
           />
         </div>
       </aside>

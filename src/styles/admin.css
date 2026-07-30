@@ -450,6 +450,21 @@
   background: var(--color-surface-soft);
 }
 
+.ticket-status--bot_active {
+  color: #51606e;
+  background: #eef1f4;
+}
+
+.ticket-status--waiting {
+  color: #9b6300;
+  background: #fff4d6;
+}
+
+.ticket-status--human_active {
+  color: #146c43;
+  background: #e6f7ee;
+}
+
 .ticket-detail {
   background: var(--color-surface);
 }
@@ -534,6 +549,216 @@
   background: var(--color-surface);
   font-size: 12px;
   font-weight: 800;
+}
+
+.admin-login {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--color-background);
+}
+
+.admin-login form {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.admin-login h1,
+.admin-login p {
+  margin: 0;
+}
+
+.admin-login form > button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 14px;
+  color: white;
+  background: var(--color-primary);
+  font-weight: 800;
+}
+
+.admin-account {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--color-surface-soft);
+}
+
+.admin-account span {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-account small {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.admin-account button {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: white;
+}
+
+.admin-callout {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+}
+
+.admin-callout--error {
+  color: var(--color-danger);
+  background: #fff0ef;
+}
+
+.admin-unread {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  min-width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: white;
+  background: var(--color-primary);
+  font-size: 10px;
+}
+
+.ticket-list-item {
+  position: relative;
+}
+
+.support-thread {
+  max-height: 460px;
+  display: grid;
+  gap: 12px;
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface-soft);
+  content-visibility: auto;
+}
+
+.support-thread__message {
+  max-width: 82%;
+  display: grid;
+  gap: 4px;
+  justify-self: start;
+}
+
+.support-thread__message--visitor {
+  justify-self: end;
+}
+
+.support-thread__message span,
+.support-thread__message time {
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+}
+
+.support-thread__message p {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: white;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.support-thread__message--visitor p {
+  border-color: transparent;
+  color: white;
+  background: var(--color-primary);
+}
+
+.support-thread__message--system {
+  max-width: 100%;
+  justify-self: center;
+  text-align: center;
+}
+
+.support-thread__message--system p {
+  color: var(--color-text-secondary);
+  background: transparent;
+}
+
+.support-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.support-reply {
+  display: grid;
+  gap: 8px;
+}
+
+.support-reply textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.support-reply button,
+.support-notes button,
+.support-actions button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: white;
+  font-weight: 800;
+}
+
+.support-reply button {
+  justify-self: end;
+  color: white;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.support-notes {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #fff9e9;
+}
+
+.support-notes > p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.support-notes > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
 }
 
 .data-grid {
