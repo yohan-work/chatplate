@@ -57,14 +57,15 @@ npm run build
 기본 삽입:
 
 ```html
-<script src="/widget.js" data-bot-id="alf-demo"></script>
+<script type="module" src="/widget.js" data-bot-id="alf-demo"></script>
 ```
 
 직접 초기화:
 
 ```html
-<script src="/widget.js" data-auto-init="false"></script>
-<script>
+<script type="module" src="/widget.js" data-auto-init="false"></script>
+<script type="module">
+  await window.ChatplateReady;
   window.Chatplate.init({ botId: "animal-hospital" });
 </script>
 ```
@@ -98,7 +99,7 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
-`supabase/migrations/202607300001_support_chat.sql`을 적용하고 Supabase Auth에서 anonymous sign-in을 활성화합니다. 최초 관리자는 Auth 사용자를 생성한 뒤 같은 UUID로 `profiles`에 owner를 등록합니다.
+`supabase/migrations`의 SQL을 순서대로 적용하고 Supabase Auth에서 anonymous sign-in을 활성화합니다. 최초 관리자는 Auth 사용자를 생성한 뒤 같은 UUID로 `profiles`에 owner를 등록합니다.
 
 ```sql
 insert into public.profiles (id, display_name, email, role)
@@ -115,10 +116,45 @@ values ('AUTH_USER_UUID', '대표 관리자', 'owner@example.com', 'owner');
 
 관리자 내부 메모는 고객 메시지와 별도 저장됩니다. 기존 localStorage `Ticket` 데이터는 호환 내보내기 용도로만 유지되며 새 채팅상담에는 사용하지 않습니다.
 
-## 향후 확장
+### 운영 준비 기능
 
-- API에서 `botConfig` 로딩
-- 서버 기반 conversation event 저장
-- 로그인/권한 관리
-- CDN 배포
-- 도메인별 템플릿팩 배포
+- FAQ·공지 설정은 초안 저장 후 명시적으로 배포하며 이전 배포본으로 롤백할 수 있습니다.
+- 외부 위젯은 전체 FAQ를 번들에 넣지 않고 published config를 조회합니다.
+- 상담함은 고객·연락처·메시지 검색, 미배정/내 상담 필터, 담당 이관, audit 이력, 저장 답변을 지원합니다.
+- 코치마이웨이 기본 schedule은 `Asia/Seoul`, 평일 10:00~18:00이며 최초 답변 목표 240분은 운영시간과 휴무일만 합산합니다.
+- 상담원 답변은 2분 지연 Outbox에 들어가며 고객이 먼저 읽으면 취소됩니다.
+- 알림 provider는 현재 `log` adapter이고, 실제 이메일·문자·카카오는 홈페이지 구축 시 연결합니다.
+- 알림에 사용할 resume token은 hash만 저장하고 7일 후 만료되며 한 번만 사용할 수 있습니다.
+- 개인정보 기본 보관기간은 180일이며 `anonymize_expired_support_contacts`로 익명화합니다.
+- `verify-visitor` Edge Function은 Turnstile과 허용 origin을 검증할 수 있습니다. 로컬 `supabase/config.toml`에서는 CAPTCHA를 비활성화합니다.
+
+Edge Function 배포 시 필요한 secret:
+
+```text
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+TURNSTILE_SECRET_KEY
+OUTBOX_CRON_SECRET
+```
+
+`process-notification-outbox`는 1분 주기로 호출하도록 설정합니다. 실제 provider 연결 전에는 상담 내용을 외부로 전송하지 않고 구조화 로그만 남깁니다.
+
+## 품질 검증
+
+```bash
+npm run lint
+npm test
+npm run build
+npm run check:widget-budget
+```
+
+외부 widget build는 작은 `widget.js` loader와 클릭 후 로드되는 versioned chunk로 분리됩니다. CI는 loader 20KB gzip, widget app 150KB gzip, CSS 20KB gzip 예산을 검사합니다.
+
+## 홈페이지 구축 시 남은 연결 작업
+
+- 원격 Supabase migration과 RLS 통합 테스트
+- production bot config 최초 배포
+- 실제 도메인 allowed origin과 Turnstile key 설정
+- owner/operator 실제 계정 및 MFA 설정
+- 이메일·문자·카카오 중 알림 provider 선택
+- Outbox cron, 개인정보 익명화 cron, 오류 모니터링 provider 연결

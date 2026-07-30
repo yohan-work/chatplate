@@ -1,6 +1,6 @@
 # Chatplate Handoff
 
-Last updated: 2026-07-30 11:23 KST
+Last updated: 2026-07-30 15:14 KST
 
 ## 현재 제품 방향
 
@@ -21,6 +21,19 @@ bot_active -> waiting -> human_active -> resolved
 - `resolved`: 상담 완료 상태다. 고객이 메시지를 보내면 같은 스레드가 `human_active`로 재개된다.
 
 ## 이번 작업 결과
+
+### 실제 운영 준비 하드닝
+
+- 상담 repository가 cursor 검색, 미배정/내 상담 필터, 담당 이관, audit, 저장 답변, 알림 Outbox, 개인정보 익명화를 지원한다.
+- bot config는 Zod schema로 검증하고 `초안 → 배포 → 이전 버전 롤백` 상태로 관리한다.
+- production widget은 빌드에 전체 FAQ를 넣지 않고 published config를 조회한다.
+- 외부 widget build는 gzip 1.21KB loader와 81.70KB 지연 로딩 앱으로 분리됐다.
+- 고객 메시지는 전송 중·실패 상태와 재시도를 제공한다.
+- 코치마이웨이 평일 운영시간과 휴무일을 기준으로 최초 응답 목표 시각을 계산한다.
+- 연락 방법과 180일 개인정보 보관 동의를 명시적으로 수집한다.
+- 상담원 초대·비활성화, 담당자 이관, 저장 답변, 상담 검색과 audit 이력을 관리자 화면에 추가했다.
+- Supabase production hardening migration, Turnstile 검증, resume-token 교환, 상담원 초대, provider-neutral Outbox Edge Function을 준비했다.
+- GitHub Actions에서 lint, test, build와 widget bundle budget을 검사한다.
 
 ### 서버 준비
 
@@ -80,18 +93,21 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 
 ## 미검증 및 남은 위험
 
-- 실제 Supabase 프로젝트 URL·키가 없어 migration 적용, anonymous Auth, RLS, RPC, Realtime의 원격 통합은 아직 실행하지 않았다.
-- owner/operator 계정 생성 UI는 없다. 현재는 Supabase Auth와 SQL로 초기 계정을 등록해야 한다.
+- 실제 Supabase 프로젝트 URL·키와 로컬 Supabase CLI가 없어 두 migration, pgTAP, Edge Function, anonymous Auth, RLS, RPC, Realtime의 DB 통합은 실행하지 않았다.
+- owner는 초기 한 명을 Supabase Auth와 SQL로 등록해야 한다. 이후 상담원 초대 UI는 준비됐다.
 - 고객 알림은 위젯 읽지 않음 배지만 지원한다. 이메일·SMS·카카오 알림은 범위 밖이다.
-- 파일 첨부, SLA, 검색·정렬·저장 필터, 상담원 초대, 감사 로그는 다음 운영 단계다.
+- Outbox는 구조화 log adapter까지만 구현했다. 실제 이메일·SMS·카카오 provider와 cron secret은 홈페이지 구축 시 연결한다.
+- 운영시간 schedule은 평일 10:00~18:00, 4 운영시간 목표로 초기화했다. 실제 계약 운영시간과 휴무일은 홈페이지 구축 시 확인해야 한다.
+- 파일 첨부, 옴니채널, 결제, LLM은 범위 밖이다.
 - 기존 localStorage `Ticket` 내보내기는 과거 데모 호환을 위해 데이터 패널에 남아 있지만 새 채팅 상담 흐름에서는 사용하지 않는다.
 
 ## 다음 단계
 
-1. 별도 Supabase staging 프로젝트에 migration을 적용한다.
-2. 익명 고객 2명과 owner/operator 2명으로 RLS 접근 격리와 동시 선점 충돌을 검증한다.
-3. 두 브라우저에서 Realtime 메시지·읽지 않음·완료 후 재개를 확인한다.
-4. 검증 결과에 따라 관리자 초대/비활성화와 상담 검색·필터 중 코치마이웨이 운영에 필요한 항목만 우선순위화한다.
+1. Supabase CLI 또는 staging 프로젝트에 migration을 적용하고 `supabase/tests`를 실행한다.
+2. 익명 고객 2명과 owner/operator 2명으로 RLS 접근 격리, resume token, 동시 선점과 이관을 검증한다.
+3. production bot config v1을 배포하고 외부 `widget.js`가 published config를 가져오는지 확인한다.
+4. 실제 홈페이지 도메인의 Turnstile·allowed origin과 알림 provider·cron을 연결한다.
+5. 코치마이웨이 실제 계약 영업시간과 휴무일로 schedule 값을 확정한다.
 
 ## 주요 파일
 
