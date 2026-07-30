@@ -9,10 +9,20 @@ interface ChatBubbleProps {
   onRequestHandoff: (message: ChatMessage) => void;
   handoffLabel?: string;
   onClarificationSelect: (option: ClarificationOption) => void;
+  automationEnabled?: boolean;
 }
 
-export function ChatBubble({ message, onQuestionSelect, onAction, onFeedback, onRequestHandoff, handoffLabel, onClarificationSelect }: ChatBubbleProps) {
-  const canGiveFeedback = message.role === 'bot' && Boolean(message.confidence);
+export function ChatBubble({
+  message,
+  onQuestionSelect,
+  onAction,
+  onFeedback,
+  onRequestHandoff,
+  handoffLabel,
+  onClarificationSelect,
+  automationEnabled = true,
+}: ChatBubbleProps) {
+  const canGiveFeedback = automationEnabled && message.role === 'bot' && Boolean(message.confidence);
 
   return (
     <article className={`chat-bubble chat-bubble--${message.role}`}>
@@ -24,7 +34,7 @@ export function ChatBubble({ message, onQuestionSelect, onAction, onFeedback, on
           ))}
         </div>
       ) : null}
-      {message.suggestions?.length ? (
+      {automationEnabled && message.suggestions?.length ? (
         <div className="suggestion-list">
           {message.suggestions.map((item) => (
             <button key={item.id} type="button" onClick={() => onQuestionSelect(item)}>
@@ -33,7 +43,7 @@ export function ChatBubble({ message, onQuestionSelect, onAction, onFeedback, on
           ))}
         </div>
       ) : null}
-      {message.clarificationOptions?.length ? (
+      {automationEnabled && message.clarificationOptions?.length ? (
         <div className="suggestion-list">
           {message.clarificationOptions.map((option) => (
             <button key={option.label} type="button" onClick={() => onClarificationSelect(option)}>
@@ -42,7 +52,7 @@ export function ChatBubble({ message, onQuestionSelect, onAction, onFeedback, on
           ))}
         </div>
       ) : null}
-      {message.relatedQuestions?.length ? (
+      {automationEnabled && message.relatedQuestions?.length ? (
         <div className="related-list">
           {message.relatedQuestions.map((item) => (
             <button key={item.id} type="button" onClick={() => onQuestionSelect(item)}>
@@ -71,7 +81,7 @@ export function ChatBubble({ message, onQuestionSelect, onAction, onFeedback, on
           </button>
         </div>
       ) : null}
-      {message.handoffCta ? (
+      {automationEnabled && message.handoffCta ? (
         <button className="handoff-button" type="button" onClick={() => onRequestHandoff(message)}>
           {handoffLabel ?? '상담 요청 남기기'}
         </button>

@@ -1,4 +1,12 @@
-import type { BotConfig, ChatMessage, ClarificationOption, KnowledgeItem, Ticket, TicketSource } from '../../types/chatbot';
+import type {
+  BotConfig,
+  ChatMessage,
+  ClarificationOption,
+  ConversationContact,
+  ConversationStatus,
+  KnowledgeItem,
+  TicketSource,
+} from '../../types/chatbot';
 import { findKnowledgeById } from '../../engine/searchKnowledge';
 import { ChatBubble } from './ChatBubble';
 import { ChatInput } from './ChatInput';
@@ -21,8 +29,11 @@ interface ChatViewProps {
   onFeedback: (messageId: string, feedback: 'helpful' | 'not-helpful') => void;
   onRequestHandoff: (message: ChatMessage) => void;
   onCancelContactRequest: () => void;
-  onTicketCreated: (ticket: Ticket) => void;
+  onHandoffSubmit: (contact: ConversationContact, message: string) => Promise<void>;
   onClarificationSelect: (option: ClarificationOption) => void;
+  conversationStatus?: ConversationStatus;
+  isSyncing?: boolean;
+  syncError?: string;
 }
 
 export function ChatView({
@@ -35,11 +46,24 @@ export function ChatView({
   onFeedback,
   onRequestHandoff,
   onCancelContactRequest,
-  onTicketCreated,
+  onHandoffSubmit,
   onClarificationSelect,
+  conversationStatus = 'bot_active',
+  isSyncing = false,
+  syncError,
 }: ChatViewProps) {
+  const statusText = conversationStatus === 'waiting'
+    ? '상담원 연결을 기다리고 있어요.'
+    : conversationStatus === 'human_active'
+      ? '상담원이 대화에 참여 중이에요.'
+      : conversationStatus === 'resolved'
+        ? '상담이 완료됐어요. 메시지를 보내면 다시 연결됩니다.'
+        : '';
+
   return (
     <div className="chat-view">
+      {statusText ? <div className={`conversation-state conversation-state--${conversationStatus}`}>{statusText}</div> : null}
+      {syncError ? <div className="conversation-sync-error" role="alert">{syncError}</div> : null}
       <div className="message-list" aria-live="polite">
         {messages.map((message) => (
           <ChatBubble
@@ -49,19 +73,17 @@ export function ChatView({
             onAction={onAction}
             onFeedback={onFeedback}
             onRequestHandoff={onRequestHandoff}
-            handoffLabel={botConfig.handoff?.label}
+            handoffLabel="상담원 연결"
             onClarificationSelect={onClarificationSelect}
+            automationEnabled={conversationStatus === 'bot_active'}
           />
         ))}
         {contactRequest ? (
           <ContactRequestForm
             botConfig={botConfig}
-            source={contactRequest.source}
             originalQuestion={contactRequest.originalQuestion}
-            matchedKnowledgeIds={contactRequest.matchedKnowledgeIds}
-            conversationEventId={contactRequest.conversationEventId}
             onCancel={onCancelContactRequest}
-            onCreated={onTicketCreated}
+            onSubmit={onHandoffSubmit}
           />
         ) : null}
       </div>
@@ -79,7 +101,11 @@ export function ChatView({
         </div>
       ) : null}
 
-      <ChatInput placeholder="궁금한 점을 입력해 주세요." onSubmit={onSubmit} />
+      <ChatInput
+        placeholder={conversationStatus === 'bot_active' ? '궁금한 점을 입력해 주세요.' : '상담원에게 메시지를 남겨 주세요.'}
+        onSubmit={onSubmit}
+        disabled={isSyncing}
+      />
       <p className="disclaimer">{botConfig.bot.disclaimer}</p>
     </div>
   );

@@ -1,62 +1,63 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import type { BotConfig, Ticket, TicketSource } from '../../types/chatbot';
-import { appendTicket, validateTicketInput } from '../../utils/ticketStorage';
+import type { BotConfig, ConversationContact } from '../../types/chatbot';
 
 interface ContactRequestFormProps {
   botConfig: BotConfig;
-  source: TicketSource;
   originalQuestion?: string;
-  matchedKnowledgeIds?: string[];
-  conversationEventId?: string;
   onCancel: () => void;
-  onCreated: (ticket: Ticket) => void;
+  onSubmit: (contact: ConversationContact, message: string) => Promise<void>;
 }
 
 export function ContactRequestForm({
   botConfig,
-  source,
   originalQuestion,
-  matchedKnowledgeIds = [],
-  conversationEventId,
   onCancel,
-  onCreated,
+  onSubmit,
 }: ContactRequestFormProps) {
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [message, setMessage] = useState(originalQuestion ?? '');
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    const input = {
-      botId: botConfig.bot.id,
-      source,
-      name,
-      contact,
-      message,
-      originalQuestion,
-      matchedKnowledgeIds,
-      conversationEventId,
-    };
-    const validation = validateTicketInput(input);
-    const nextErrors = privacyAgreed ? validation.errors : [...validation.errors, '개인정보 수집에 동의해 주세요.'];
+    const nextErrors = [
+      ...(!name.trim() ? ['이름을 입력해 주세요.'] : []),
+      ...(!contact.trim() ? ['연락처 또는 이메일을 입력해 주세요.'] : []),
+      ...(!message.trim() ? ['문의 내용을 입력해 주세요.'] : []),
+      ...(!privacyAgreed ? ['개인정보 수집에 동의해 주세요.'] : []),
+    ];
 
     if (nextErrors.length) {
       setErrors(nextErrors);
       return;
     }
 
-    const ticket = appendTicket(input);
-    onCreated(ticket);
+    setErrors([]);
+    setIsSubmitting(true);
+    try {
+      await onSubmit(
+        {
+          name: name.trim(),
+          contact: contact.trim(),
+          privacyAgreedAt: new Date().toISOString(),
+        },
+        message.trim(),
+      );
+    } catch (error) {
+      setErrors([error instanceof Error ? error.message : '상담 요청을 접수하지 못했습니다.']);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <form className="contact-request-form" onSubmit={handleSubmit}>
       <div className="contact-request-form__head">
-        <strong>상담 요청 남기기</strong>
+        <strong>상담원 연결 요청</strong>
         <span>{botConfig.operation.csHours}</span>
       </div>
 
@@ -86,10 +87,12 @@ export function ContactRequestForm({
       </label>
 
       <div className="contact-request-actions">
-        <button type="button" onClick={onCancel}>
+        <button type="button" onClick={onCancel} disabled={isSubmitting}>
           취소
         </button>
-        <button type="submit">요청 접수</button>
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? '연결 중…' : '상담 연결'}
+        </button>
       </div>
     </form>
   );

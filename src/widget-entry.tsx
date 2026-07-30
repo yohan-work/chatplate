@@ -48,7 +48,8 @@ function resolveConfig(options?: ChatplateInitOptions): BotConfig {
 
 function PublicWidget({ botConfig }: { botConfig: BotConfig }) {
   const [isOpen, setIsOpen] = useState(false);
-  const unreadCount = botConfig.notices.filter((notice) => notice.unread).length;
+  const [supportUnreadCount, setSupportUnreadCount] = useState(0);
+  const unreadCount = botConfig.notices.filter((notice) => notice.unread).length + supportUnreadCount;
 
   return (
     <>
@@ -57,6 +58,7 @@ function PublicWidget({ botConfig }: { botConfig: BotConfig }) {
         botConfig={botConfig}
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
+        onUnreadChange={setSupportUnreadCount}
       />
     </>
   );

@@ -336,6 +336,59 @@
   line-height: 1.35;
 }
 
+.conversation-card.is-active {
+  border-color: color-mix(in srgb, var(--chatplate-primary) 35%, var(--color-border));
+  background: color-mix(in srgb, var(--chatplate-primary) 6%, white);
+}
+
+.conversation-unread {
+  min-width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: white;
+  background: var(--chatplate-primary);
+  font-size: 11px;
+}
+
+.conversation-empty {
+  margin: 0;
+  padding: 24px 16px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+.conversation-state,
+.conversation-sync-error {
+  margin: 0 4px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.conversation-state {
+  color: #315b9a;
+  background: #edf4ff;
+}
+
+.conversation-state--human_active {
+  color: #0f6b3c;
+  background: #eaf8f0;
+}
+
+.conversation-state--resolved {
+  color: var(--color-text-secondary);
+  background: var(--color-surface-soft);
+}
+
+.conversation-sync-error {
+  color: var(--color-danger);
+  background: #fff0ef;
+}
+
 .text-button {
   min-height: 32px;
   padding: 0;
