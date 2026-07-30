@@ -10,6 +10,7 @@ interface ChatBubbleProps {
   handoffLabel?: string;
   onClarificationSelect: (option: ClarificationOption) => void;
   automationEnabled?: boolean;
+  onRetry?: (message: ChatMessage) => void;
 }
 
 export function ChatBubble({
@@ -21,6 +22,7 @@ export function ChatBubble({
   handoffLabel,
   onClarificationSelect,
   automationEnabled = true,
+  onRetry,
 }: ChatBubbleProps) {
   const canGiveFeedback = automationEnabled && message.role === 'bot' && Boolean(message.confidence);
 
@@ -87,6 +89,14 @@ export function ChatBubble({
         </button>
       ) : null}
       <time>{message.createdAt}</time>
+      {message.role === 'user' && message.deliveryStatus === 'pending' ? (
+        <small className="message-delivery">전송 중…</small>
+      ) : null}
+      {message.role === 'user' && message.deliveryStatus === 'failed' ? (
+        <button className="message-retry" type="button" onClick={() => onRetry?.(message)}>
+          전송 실패 · 다시 시도
+        </button>
+      ) : null}
     </article>
   );
 }

@@ -16,7 +16,19 @@
   },
   "operation": {
     "botHours": "24시간 등록 안내",
-    "csHours": "상담 요청을 남기면 확인 후 이 채팅에서 답변드립니다."
+    "csHours": "평일 10:00~18:00, 상담 요청 후 운영시간 기준 4시간 이내 답변",
+    "supportSchedule": {
+      "timezone": "Asia/Seoul",
+      "weekly": {
+        "mon": [{ "start": "10:00", "end": "18:00" }],
+        "tue": [{ "start": "10:00", "end": "18:00" }],
+        "wed": [{ "start": "10:00", "end": "18:00" }],
+        "thu": [{ "start": "10:00", "end": "18:00" }],
+        "fri": [{ "start": "10:00", "end": "18:00" }]
+      },
+      "holidays": [],
+      "firstResponseTargetMinutes": 240
+    }
   },
   "handoff": {
     "channelId": "kakao",

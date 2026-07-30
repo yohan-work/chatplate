@@ -16,6 +16,7 @@ export function ContactRequestForm({
   onSubmit,
 }: ContactRequestFormProps) {
   const [name, setName] = useState('');
+  const [channel, setChannel] = useState<'email' | 'sms'>('sms');
   const [contact, setContact] = useState('');
   const [message, setMessage] = useState(originalQuestion ?? '');
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
@@ -43,7 +44,9 @@ export function ContactRequestForm({
         {
           name: name.trim(),
           contact: contact.trim(),
+          channel,
           privacyAgreedAt: new Date().toISOString(),
+          consentVersion: '2026-07',
         },
         message.trim(),
       );
@@ -74,8 +77,20 @@ export function ContactRequestForm({
         <input value={name} onChange={(event) => setName(event.target.value)} placeholder="홍길동" />
       </label>
       <label>
-        <span>연락처</span>
-        <input value={contact} onChange={(event) => setContact(event.target.value)} placeholder="이메일 또는 전화번호" />
+        <span>답변 받을 방법</span>
+        <select value={channel} onChange={(event) => setChannel(event.target.value as 'email' | 'sms')}>
+          <option value="sms">전화번호</option>
+          <option value="email">이메일</option>
+        </select>
+      </label>
+      <label>
+        <span>{channel === 'email' ? '이메일' : '전화번호'}</span>
+        <input
+          value={contact}
+          inputMode={channel === 'email' ? 'email' : 'tel'}
+          onChange={(event) => setContact(event.target.value)}
+          placeholder={channel === 'email' ? 'name@example.com' : '010-0000-0000'}
+        />
       </label>
       <label>
         <span>문의 내용</span>
@@ -83,7 +98,7 @@ export function ContactRequestForm({
       </label>
       <label className="contact-request-check">
         <input type="checkbox" checked={privacyAgreed} onChange={(event) => setPrivacyAgreed(event.target.checked)} />
-        <span>답변을 위해 입력 정보를 저장하는 데 동의합니다.</span>
+        <span>답변을 위해 입력 정보를 최대 180일간 저장하는 데 동의합니다.</span>
       </label>
 
       <div className="contact-request-actions">

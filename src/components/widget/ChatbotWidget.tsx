@@ -28,6 +28,8 @@ import type {
 import { createClientMessageId, supportMessageToChatMessage } from '../../services/chatRepository';
 import type { ChatRepository } from '../../services/chatRepository';
 import { getChatRepository } from '../../services/getChatRepository';
+import { getAnalyticsRepository } from '../../services/analyticsRepository';
+import { calculateFirstResponseDueAt } from '../../services/calculateFirstResponseDueAt';
 import { BottomNavigation } from './BottomNavigation';
 import { HomeView } from '../home/HomeView';
 import { ChatView } from '../chat/ChatView';
@@ -87,6 +89,7 @@ export function ChatbotWidget({
   const [isSyncing, setIsSyncing] = useState(true);
   const [syncError, setSyncError] = useState<string>();
   const repository = useMemo(() => chatRepository ?? getChatRepository('visitor'), [chatRepository]);
+  const analyticsRepository = useMemo(() => getAnalyticsRepository('visitor'), []);
 
   const refreshConversation = useCallback(async (conversationId: string) => {
     const bundle = await repository.loadConversation(conversationId);
@@ -150,7 +153,19 @@ export function ChatbotWidget({
       setConversationContext(undefined);
       setPendingClarificationEventId(undefined);
       try {
-        let bundle = await repository.getOrCreateVisitorConversation(botConfig.bot.id);
+        const resumeToken = new URLSearchParams(window.location.search).get('chatplate-resume');
+        const resumedConversationId = resumeToken
+          ? await repository.redeemConversation(resumeToken)
+          : undefined;
+        let bundle = resumedConversationId
+          ? await repository.loadConversation(resumedConversationId)
+          : await repository.getOrCreateVisitorConversation(botConfig.bot.id);
+        if (!bundle) throw new Error('재접속할 상담 대화를 찾지 못했습니다.');
+        if (resumeToken) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('chatplate-resume');
+          window.history.replaceState(null, '', url);
+        }
         if (bundle.messages.length === 0) {
           const greeting = createMessage('bot', botConfig.bot.greeting, { id: `greeting-${bundle.conversation.id}` });
           await persistMessage(bundle.conversation.id, greeting, 'bot');
@@ -310,7 +325,10 @@ export function ChatbotWidget({
     if (!supportConversation || isSyncing) return;
     setIsSyncing(true);
     setSyncError(undefined);
-    const userMessage = createMessage('user', query, { id: createClientMessageId('visitor') });
+    const userMessage = createMessage('user', query, {
+      id: createClientMessageId('visitor'),
+      deliveryStatus: 'pending',
+    });
     setMessages((current) => [...current, userMessage]);
     setActiveView('chat');
     try {
@@ -326,7 +344,8 @@ export function ChatbotWidget({
 
       if (resolution.kind === 'smalltalk') {
         const event = createSmallTalkConversationEvent(botConfig.bot.id, resolution);
-        appendConversationEvent(event);
+        if (repository.kind === 'local') appendConversationEvent(event);
+        else void analyticsRepository.record(supportConversation.id, event).catch(() => undefined);
         botMessage = createMessage('bot', resolution.replyText ?? botConfig.bot.fallbackMessage, {
           suggestions: resolution.showSuggestions ? getFallbackSuggestions(botConfig) : undefined,
           confidence: 'high',
@@ -337,7 +356,8 @@ export function ChatbotWidget({
         const result = resolution.searchResult ?? searchKnowledge(query, botConfig, { intentId: selectedIntentId });
         if (resolution.contextPatch) setConversationContext(resolution.contextPatch);
         const event = createConversationEvent(botConfig.bot.id, query, result, resolution.effectiveQuery, resolution.routeDecision);
-        appendConversationEvent(event);
+        if (repository.kind === 'local') appendConversationEvent(event);
+        else void analyticsRepository.record(supportConversation.id, event).catch(() => undefined);
         if (resolution.routeDecision?.mode === 'clarification') setPendingClarificationEventId(event.id);
         onSearchResult?.(query, result);
 
@@ -396,6 +416,15 @@ export function ChatbotWidget({
       await refreshConversationHistory();
       onConversationChanged?.();
     } catch (error) {
+      setMessages((current) => current.map((message) =>
+        message.id === userMessage.id
+          ? {
+            ...message,
+            deliveryStatus: 'failed',
+            failureReason: error instanceof Error ? error.message : '메시지를 전송하지 못했습니다.',
+          }
+          : message,
+      ));
       setSyncError(error instanceof Error ? error.message : '메시지를 전송하지 못했습니다.');
     } finally {
       setIsSyncing(false);
@@ -419,7 +448,12 @@ export function ChatbotWidget({
       setMessages((current) => [...current, additionalMessage]);
       await persistMessage(supportConversation.id, additionalMessage, 'visitor');
     }
-    await repository.requestHandoff(supportConversation.id, contact, contactRequest.source);
+    await repository.requestHandoff(
+      supportConversation.id,
+      contact,
+      contactRequest.source,
+      calculateFirstResponseDueAt(botConfig.operation),
+    );
     setContactRequest(null);
     await refreshConversation(supportConversation.id);
     await refreshConversationHistory();
@@ -520,6 +554,10 @@ export function ChatbotWidget({
             conversationStatus={supportConversation?.status}
             isSyncing={isSyncing}
             syncError={syncError}
+            onRetryMessage={(message) => {
+              setMessages((current) => current.filter((entry) => entry.id !== message.id));
+              void handleSubmit(message.text);
+            }}
           />
         ) : null}
         {activeView === 'conversations' ? (

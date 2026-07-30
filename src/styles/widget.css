@@ -611,6 +611,21 @@
   display: none;
 }
 
+.message-delivery {
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+}
+
+.message-retry {
+  justify-self: end;
+  padding: 4px 0;
+  border: 0;
+  color: var(--color-danger);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .chat-bubble--bot {
   align-self: flex-start;
   width: 100%;
@@ -708,6 +723,7 @@
 }
 
 .contact-request-form input,
+.contact-request-form select,
 .contact-request-form textarea {
   width: 100%;
   min-width: 0;
@@ -719,6 +735,11 @@
 }
 
 .contact-request-form input {
+  height: 38px;
+  padding: 0 10px;
+}
+
+.contact-request-form select {
   height: 38px;
   padding: 0 10px;
 }

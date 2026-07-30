@@ -34,6 +34,7 @@ interface ChatViewProps {
   conversationStatus?: ConversationStatus;
   isSyncing?: boolean;
   syncError?: string;
+  onRetryMessage: (message: ChatMessage) => void;
 }
 
 export function ChatView({
@@ -51,6 +52,7 @@ export function ChatView({
   conversationStatus = 'bot_active',
   isSyncing = false,
   syncError,
+  onRetryMessage,
 }: ChatViewProps) {
   const statusText = conversationStatus === 'waiting'
     ? '상담원 연결을 기다리고 있어요.'
@@ -76,6 +78,7 @@ export function ChatView({
             handoffLabel="상담원 연결"
             onClarificationSelect={onClarificationSelect}
             automationEnabled={conversationStatus === 'bot_active'}
+            onRetry={onRetryMessage}
           />
         ))}
         {contactRequest ? (

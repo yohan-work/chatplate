@@ -6,14 +6,13 @@ export default defineConfig({
   build: {
     emptyOutDir: false,
     cssCodeSplit: true,
-    lib: {
-      entry: 'src/widget-entry.tsx',
-      name: 'ChatplateBundle',
-      formats: ['iife'],
-      fileName: () => 'widget.js',
-    },
     rollupOptions: {
+      input: {
+        widget: 'src/widget-loader.ts',
+      },
       output: {
+        entryFileNames: 'widget.js',
+        chunkFileNames: 'widget-[name]-[hash].js',
         assetFileNames: (assetInfo) => (assetInfo.name === 'style.css' ? 'widget.css' : '[name][extname]'),
       },
     },
