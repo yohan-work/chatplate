@@ -1,0 +1,13 @@
+project_id = "chatplate-local"
+
+[auth]
+enabled = true
+
+[auth.email]
+enable_signup = true
+
+[auth.captcha]
+enabled = false
+
+[functions.process-notification-outbox]
+verify_jwt = false

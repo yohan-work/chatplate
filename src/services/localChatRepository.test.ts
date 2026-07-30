@@ -113,4 +113,51 @@ describe('LocalChatRepository', () => {
     ]);
     expect((await repository.loadConversation(created.conversation.id))?.messages).toHaveLength(0);
   });
+
+  it('supports operational filters, transfer audit, outbox cancellation, and retention', async () => {
+    const repository = new LocalChatRepository(createStorage(), 'admin');
+    const created = await repository.createVisitorConversation('coach-myway');
+    await repository.requestHandoff(
+      created.conversation.id,
+      {
+        name: '고객',
+        contact: 'customer@example.com',
+        channel: 'email',
+        privacyAgreedAt: '2025-01-01T00:00:00.000Z',
+        consentVersion: '2026-07',
+      },
+      'fallback',
+    );
+    await repository.claimConversation(created.conversation.id, admin);
+    const secondAdmin = { ...admin, id: 'admin-2', displayName: '두 번째 상담원' };
+    await repository.transferConversation(created.conversation.id, { ...admin, role: 'owner' }, secondAdmin);
+    await repository.appendMessage({
+      conversationId: created.conversation.id,
+      clientId: 'operator-outbox',
+      sender: 'operator',
+      senderId: secondAdmin.id,
+      senderName: secondAdmin.displayName,
+      text: '답변입니다.',
+    });
+
+    expect((await repository.queryConversations({
+      botId: 'coach-myway',
+      assignment: 'mine',
+      adminId: secondAdmin.id,
+      search: '답변',
+    })).items).toHaveLength(1);
+    expect(await repository.listNotificationOutbox(created.conversation.id)).toMatchObject([
+      { status: 'pending', channel: 'email' },
+    ]);
+
+    await repository.markRead(created.conversation.id, 'visitor');
+    expect(await repository.listNotificationOutbox(created.conversation.id)).toMatchObject([
+      { status: 'cancelled' },
+    ]);
+    expect((await repository.listAuditEvents(created.conversation.id)).map((event) => event.action))
+      .toContain('conversation_transferred');
+
+    expect(await repository.anonymizeExpiredContacts(180, new Date('2027-07-30T00:00:00.000Z'))).toBe(1);
+    expect((await repository.loadConversation(created.conversation.id))?.conversation.contact?.contact).toBe('삭제됨');
+  });
 });

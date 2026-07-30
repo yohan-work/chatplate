@@ -1,14 +1,20 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   AdminProfile,
+  ConversationListQuery,
+  ConversationPage,
   ConversationContact,
+  NotificationOutboxItem,
+  SupportAuditEvent,
   SupportConversation,
   SupportConversationBundle,
   SupportInternalNote,
   SupportMessage,
+  SupportSavedReply,
   TicketSource,
 } from '../types/chatbot';
 import type { AppendSupportMessageInput, ChatRepository } from './chatRepository';
+import { getSupabaseClient } from './supabaseClient';
 
 interface ConversationRow {
   id: string;
@@ -21,10 +27,14 @@ interface ConversationRow {
   contact_name: string | null;
   contact_value: string | null;
   privacy_agreed_at: string | null;
+  contact_channel?: ConversationContact['channel'] | null;
+  consent_version?: string | null;
   created_at: string;
   updated_at: string;
   last_message_at: string;
   resolved_at: string | null;
+  first_response_due_at?: string | null;
+  first_responded_at?: string | null;
   unread_for_visitor: number;
   unread_for_admins: number;
 }
@@ -66,7 +76,9 @@ function mapConversation(row: ConversationRow): SupportConversation {
     ? {
       name: row.contact_name,
       contact: row.contact_value,
+      channel: row.contact_channel ?? undefined,
       privacyAgreedAt: row.privacy_agreed_at,
+      consentVersion: row.consent_version ?? undefined,
     }
     : undefined;
   return {
@@ -81,6 +93,8 @@ function mapConversation(row: ConversationRow): SupportConversation {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     lastMessageAt: row.last_message_at,
+    firstResponseDueAt: row.first_response_due_at ?? undefined,
+    firstRespondedAt: row.first_responded_at ?? undefined,
     resolvedAt: row.resolved_at ?? undefined,
     unreadForVisitor: row.unread_for_visitor,
     unreadForAdmins: row.unread_for_admins,
@@ -100,6 +114,7 @@ function mapMessage(row: MessageRow): SupportMessage {
     matchedKnowledgeIds: row.matched_knowledge_ids ?? [],
     confidence: row.confidence ?? undefined,
     metadata: row.metadata ?? undefined,
+    deliveryStatus: 'sent',
     createdAt: row.created_at,
   };
 }
@@ -125,13 +140,7 @@ export class SupabaseChatRepository implements ChatRepository {
   private readonly client: SupabaseClient;
 
   constructor(url: string, publishableKey: string, runtime: 'visitor' | 'admin') {
-    this.client = createClient(url, publishableKey, {
-      auth: {
-        storageKey: `chatplate:${runtime}:auth`,
-        persistSession: true,
-        autoRefreshToken: true,
-      },
-    });
+    this.client = getSupabaseClient(url, publishableKey, runtime);
   }
 
   private async requireUserId(): Promise<string> {
@@ -177,6 +186,17 @@ export class SupabaseChatRepository implements ChatRepository {
     return { conversation, messages: await this.loadMessages(conversation.id) };
   }
 
+  async redeemConversation(token: string): Promise<string> {
+    await this.requireUserId();
+    const { data, error } = await this.client.functions.invoke('redeem-conversation', {
+      body: { token },
+    });
+    if (error) throw new Error(error.message);
+    const conversationId = (data as { conversationId?: string } | null)?.conversationId;
+    if (!conversationId) throw new Error('재접속할 상담을 찾지 못했습니다.');
+    return conversationId;
+  }
+
   async loadConversation(conversationId: string): Promise<SupportConversationBundle | null> {
     const { data, error } = await this.client
       .from('support_conversations')
@@ -199,6 +219,24 @@ export class SupabaseChatRepository implements ChatRepository {
     return ((data ?? []) as ConversationRow[]).map(mapConversation);
   }
 
+  async queryConversations(query: ConversationListQuery): Promise<ConversationPage> {
+    const { data, error } = await this.client.rpc('query_support_conversations', {
+      p_bot_id: query.botId,
+      p_status: query.status === 'all' ? null : query.status ?? null,
+      p_assignment: query.assignment ?? 'all',
+      p_search: query.search?.trim() || null,
+      p_sla: query.sla ?? 'all',
+      p_cursor: query.cursor ?? null,
+      p_limit: query.limit ?? 30,
+    });
+    if (error) throw new Error(error.message);
+    const payload = (data ?? { items: [] }) as { items?: ConversationRow[]; nextCursor?: string | null };
+    return {
+      items: (payload.items ?? []).map(mapConversation),
+      nextCursor: payload.nextCursor ?? undefined,
+    };
+  }
+
   async appendMessage(input: AppendSupportMessageInput): Promise<SupportMessage> {
     const { data, error } = await this.client.rpc('append_support_message', {
       p_conversation_id: input.conversationId,
@@ -218,6 +256,7 @@ export class SupabaseChatRepository implements ChatRepository {
     conversationId: string,
     contact: ConversationContact,
     reason: TicketSource,
+    firstResponseDueAt?: string,
   ): Promise<SupportConversation> {
     const { data, error } = await this.client.rpc('request_support_handoff', {
       p_conversation_id: conversationId,
@@ -225,13 +264,28 @@ export class SupabaseChatRepository implements ChatRepository {
       p_contact_value: contact.contact,
       p_privacy_agreed_at: contact.privacyAgreedAt,
       p_reason: reason,
+      p_contact_channel: contact.channel ?? 'sms',
+      p_consent_version: contact.consentVersion ?? '2026-07',
+      p_first_response_due_at: firstResponseDueAt ?? null,
     });
     return mapConversation(requireData(data as ConversationRow | null, error));
   }
 
-  async claimConversation(conversationId: string, _admin: AdminProfile): Promise<SupportConversation> {
+  async claimConversation(conversationId: string): Promise<SupportConversation> {
     const { data, error } = await this.client.rpc('claim_support_conversation', {
       p_conversation_id: conversationId,
+    });
+    return mapConversation(requireData(data as ConversationRow | null, error));
+  }
+
+  async transferConversation(
+    conversationId: string,
+    _fromAdmin: AdminProfile,
+    toAdmin: AdminProfile,
+  ): Promise<SupportConversation> {
+    const { data, error } = await this.client.rpc('transfer_support_conversation', {
+      p_conversation_id: conversationId,
+      p_to_admin_id: toAdmin.id,
     });
     return mapConversation(requireData(data as ConversationRow | null, error));
   }
@@ -293,6 +347,93 @@ export class SupabaseChatRepository implements ChatRepository {
     };
   }
 
+  async listAuditEvents(conversationId: string): Promise<SupportAuditEvent[]> {
+    const { data, error } = await this.client
+      .from('support_audit_events')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) => ({
+      id: row.id as string,
+      conversationId: row.conversation_id as string,
+      actorId: (row.actor_id as string | null) ?? undefined,
+      actorName: (row.actor_name as string | null) ?? undefined,
+      action: row.action as SupportAuditEvent['action'],
+      metadata: (row.metadata as Record<string, string> | null) ?? undefined,
+      createdAt: row.created_at as string,
+    }));
+  }
+
+  async listSavedReplies(botId: string): Promise<SupportSavedReply[]> {
+    const { data, error } = await this.client
+      .from('support_saved_replies')
+      .select('*')
+      .eq('bot_id', botId)
+      .order('title');
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) => ({
+      id: row.id as string,
+      botId: row.bot_id as string,
+      title: row.title as string,
+      body: row.body as string,
+      createdBy: row.created_by as string,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
+    }));
+  }
+
+  async saveReply(
+    botId: string,
+    admin: AdminProfile,
+    title: string,
+    body: string,
+  ): Promise<SupportSavedReply> {
+    const { data, error } = await this.client
+      .from('support_saved_replies')
+      .insert({ bot_id: botId, title: title.trim(), body: body.trim(), created_by: admin.id })
+      .select('*')
+      .single();
+    const row = requireData(data, error);
+    return {
+      id: row.id as string,
+      botId: row.bot_id as string,
+      title: row.title as string,
+      body: row.body as string,
+      createdBy: row.created_by as string,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
+    };
+  }
+
+  async listNotificationOutbox(conversationId?: string): Promise<NotificationOutboxItem[]> {
+    let query = this.client.from('notification_outbox').select('*').order('created_at', { ascending: false });
+    if (conversationId) query = query.eq('conversation_id', conversationId);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) => ({
+      id: row.id as string,
+      conversationId: row.conversation_id as string,
+      messageId: row.message_id as string,
+      channel: row.channel as NotificationOutboxItem['channel'],
+      status: row.status as NotificationOutboxItem['status'],
+      availableAt: row.available_at as string,
+      attempts: row.attempts as number,
+      lastError: (row.last_error as string | null) ?? undefined,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
+    }));
+  }
+
+  async anonymizeExpiredContacts(retentionDays: number, referenceDate = new Date()): Promise<number> {
+    const { data, error } = await this.client.rpc('anonymize_expired_support_contacts', {
+      p_retention_days: retentionDays,
+      p_reference_at: referenceDate.toISOString(),
+    });
+    if (error) throw new Error(error.message);
+    return Number(data ?? 0);
+  }
+
   async getCurrentAdmin(): Promise<AdminProfile | null> {
     const { data: sessionData } = await this.client.auth.getSession();
     const user = sessionData.session?.user;
@@ -305,6 +446,35 @@ export class SupabaseChatRepository implements ChatRepository {
       .maybeSingle();
     if (error) throw new Error(error.message);
     return data ? mapProfile(data as ProfileRow) : null;
+  }
+
+  async listAdmins(): Promise<AdminProfile[]> {
+    const { data, error } = await this.client.from('profiles').select('*').order('display_name');
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as ProfileRow[]).map(mapProfile);
+  }
+
+  async inviteAdmin(
+    email: string,
+    displayName: string,
+    role: AdminProfile['role'],
+  ): Promise<AdminProfile> {
+    const { data, error } = await this.client.functions.invoke('invite-support-admin', {
+      body: { email, displayName, role },
+    });
+    if (error) throw new Error(error.message);
+    return {
+      id: (data as { id: string }).id,
+      email,
+      displayName,
+      role,
+      active: true,
+    };
+  }
+
+  async setAdminActive(adminId: string, active: boolean): Promise<void> {
+    const { error } = await this.client.from('profiles').update({ active }).eq('id', adminId);
+    if (error) throw new Error(error.message);
   }
 
   async signInAdmin(email: string, password: string): Promise<AdminProfile> {

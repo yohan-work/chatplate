@@ -1,6 +1,6 @@
 export type WidgetView = 'home' | 'chat' | 'conversations' | 'settings' | 'notice';
 
-export type AdminPanelView = 'bot' | 'operation' | 'notices' | 'knowledge' | 'quickReplies' | 'smallTalk' | 'quality' | 'tickets' | 'data' | 'logs';
+export type AdminPanelView = 'bot' | 'operation' | 'notices' | 'knowledge' | 'quickReplies' | 'smallTalk' | 'quality' | 'tickets' | 'team' | 'data' | 'logs';
 
 export type ButtonType = 'url' | 'action' | 'tel' | 'mailto';
 
@@ -30,6 +30,15 @@ export interface ThemeConfig {
 export interface OperationInfo {
   botHours: string;
   csHours: string;
+  supportSchedule?: {
+    timezone: string;
+    weekly: Partial<Record<'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat', Array<{
+      start: string;
+      end: string;
+    }>>>;
+    holidays: string[];
+    firstResponseTargetMinutes: number;
+  };
 }
 
 export interface HandoffConfig {
@@ -166,6 +175,7 @@ export interface KnowledgeItem {
 }
 
 export interface BotConfig {
+  schemaVersion?: 1 | 2;
   bot: BotInfo;
   theme: ThemeConfig;
   operation: OperationInfo;
@@ -196,6 +206,8 @@ export interface ChatMessage {
   handoffCta?: boolean;
   ticketId?: string;
   clarificationOptions?: ClarificationOption[];
+  deliveryStatus?: 'pending' | 'sent' | 'failed';
+  failureReason?: string;
 }
 
 export type SearchConfidence = 'high' | 'medium' | 'low';
@@ -364,7 +376,9 @@ export interface AdminProfile {
 export interface ConversationContact {
   name: string;
   contact: string;
+  channel?: 'email' | 'sms';
   privacyAgreedAt: string;
+  consentVersion?: string;
 }
 
 export interface SupportConversation {
@@ -379,6 +393,8 @@ export interface SupportConversation {
   createdAt: string;
   updatedAt: string;
   lastMessageAt: string;
+  firstResponseDueAt?: string;
+  firstRespondedAt?: string;
   resolvedAt?: string;
   unreadForVisitor: number;
   unreadForAdmins: number;
@@ -396,6 +412,8 @@ export interface SupportMessage {
   matchedKnowledgeIds: string[];
   confidence?: SearchConfidence;
   metadata?: SupportMessageMetadata;
+  deliveryStatus?: 'pending' | 'sent' | 'failed';
+  failureReason?: string;
   createdAt: string;
 }
 
@@ -420,4 +438,78 @@ export interface SupportInternalNote {
   authorName: string;
   text: string;
   createdAt: string;
+}
+
+export type ConversationAssignmentFilter = 'all' | 'unassigned' | 'mine';
+export type ConversationSlaFilter = 'all' | 'dueSoon' | 'overdue';
+
+export interface ConversationListQuery {
+  botId: string;
+  status?: ConversationStatus | 'all';
+  assignment?: ConversationAssignmentFilter;
+  adminId?: string;
+  search?: string;
+  sla?: ConversationSlaFilter;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface ConversationPage {
+  items: SupportConversation[];
+  nextCursor?: string;
+}
+
+export type SupportAuditAction =
+  | 'handoff_requested'
+  | 'conversation_claimed'
+  | 'conversation_transferred'
+  | 'conversation_resolved'
+  | 'conversation_reopened'
+  | 'contact_anonymized'
+  | 'contact_viewed';
+
+export interface SupportAuditEvent {
+  id: string;
+  conversationId: string;
+  actorId?: string;
+  actorName?: string;
+  action: SupportAuditAction;
+  metadata?: Record<string, string>;
+  createdAt: string;
+}
+
+export interface SupportSavedReply {
+  id: string;
+  botId: string;
+  title: string;
+  body: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type NotificationOutboxStatus = 'pending' | 'processing' | 'sent' | 'cancelled' | 'failed' | 'dead';
+
+export interface NotificationOutboxItem {
+  id: string;
+  conversationId: string;
+  messageId: string;
+  channel: 'email' | 'sms' | 'log';
+  status: NotificationOutboxStatus;
+  availableAt: string;
+  attempts: number;
+  lastError?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BotConfigVersion {
+  id: string;
+  botId: string;
+  version: number;
+  state: 'draft' | 'published' | 'archived';
+  config: BotConfig;
+  createdBy: string;
+  createdAt: string;
+  publishedAt?: string;
 }
