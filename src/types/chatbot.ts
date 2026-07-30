@@ -347,3 +347,77 @@ export interface Ticket {
   createdAt: string;
   updatedAt: string;
 }
+
+export type ConversationStatus = 'bot_active' | 'waiting' | 'human_active' | 'resolved';
+export type ConversationSender = 'visitor' | 'bot' | 'operator' | 'system';
+export type ConversationMessageType = 'text' | 'handoff' | 'status';
+export type AdminRole = 'owner' | 'operator';
+
+export interface AdminProfile {
+  id: string;
+  displayName: string;
+  email: string;
+  role: AdminRole;
+  active: boolean;
+}
+
+export interface ConversationContact {
+  name: string;
+  contact: string;
+  privacyAgreedAt: string;
+}
+
+export interface SupportConversation {
+  id: string;
+  botId: string;
+  visitorId: string;
+  status: ConversationStatus;
+  assignedTo?: string;
+  assignedName?: string;
+  handoffReason?: TicketSource;
+  contact?: ConversationContact;
+  createdAt: string;
+  updatedAt: string;
+  lastMessageAt: string;
+  resolvedAt?: string;
+  unreadForVisitor: number;
+  unreadForAdmins: number;
+}
+
+export interface SupportMessage {
+  id: string;
+  conversationId: string;
+  clientId: string;
+  sender: ConversationSender;
+  senderId?: string;
+  senderName?: string;
+  type: ConversationMessageType;
+  text: string;
+  matchedKnowledgeIds: string[];
+  confidence?: SearchConfidence;
+  metadata?: SupportMessageMetadata;
+  createdAt: string;
+}
+
+export interface SupportMessageMetadata {
+  buttons?: AnswerButton[];
+  suggestionKnowledgeIds?: string[];
+  relatedKnowledgeIds?: string[];
+  clarificationOptions?: ClarificationOption[];
+  handoffCta?: boolean;
+  feedback?: ChatMessage['feedback'];
+}
+
+export interface SupportConversationBundle {
+  conversation: SupportConversation;
+  messages: SupportMessage[];
+}
+
+export interface SupportInternalNote {
+  id: string;
+  conversationId: string;
+  authorId: string;
+  authorName: string;
+  text: string;
+  createdAt: string;
+}
