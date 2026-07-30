@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import {
   Bell,
   Bot,
@@ -17,6 +17,7 @@ import {
   Trash2,
   Upload,
   UserCheck,
+  Users,
 } from 'lucide-react';
 import { searchKnowledge } from '../../engine/searchKnowledge';
 import { evaluateSearchDataset, type EvaluationMetrics } from '../../engine/evaluateSearchDataset';
@@ -31,9 +32,11 @@ import type {
   Notice,
   QuickReply,
   SmallTalkRule,
+  SupportAuditEvent,
   SupportConversation,
   SupportConversationBundle,
   SupportInternalNote,
+  SupportSavedReply,
 } from '../../types/chatbot';
 import {
   createEmptyKnowledge,
@@ -61,6 +64,16 @@ interface AdminWorkspaceProps {
   onReplaceBotConfigs: (configs: BotConfigMap) => void;
   onResetBot: () => void;
   onUnknownQuestion: (question: string) => void;
+  releaseState: {
+    draftVersion?: number;
+    publishedVersion?: number;
+    isWorking: boolean;
+    message?: string;
+    archivedVersions?: number[];
+  };
+  onSaveDraft: () => void;
+  onPublishDraft: () => void;
+  onRollback: (version: number) => void;
 }
 
 const panelItems: Array<{ id: AdminPanelView; label: string; icon: typeof Bot }> = [
@@ -72,6 +85,7 @@ const panelItems: Array<{ id: AdminPanelView; label: string; icon: typeof Bot }>
   { id: 'smallTalk', label: '일반 대화', icon: MessageCircle },
   { id: 'quality', label: '검색 품질', icon: Sparkles },
   { id: 'tickets', label: '문의함', icon: Inbox },
+  { id: 'team', label: '상담원', icon: Users },
   { id: 'data', label: '데이터', icon: Upload },
   { id: 'logs', label: '실패 질문', icon: MessageSquareWarning },
 ];
@@ -274,7 +288,7 @@ function OperationSettingsForm({
   config: BotConfig;
   onUpdate: (updater: (config: BotConfig) => BotConfig) => void;
 }) {
-  const updateOperation = (field: keyof BotConfig['operation'], value: string) => {
+  const updateOperation = (field: 'botHours' | 'csHours', value: string) => {
     onUpdate((current) => ({ ...current, operation: { ...current.operation, [field]: value } }));
   };
 
@@ -283,6 +297,22 @@ function OperationSettingsForm({
       <PanelHeader title="운영시간" description="자동 응답 시간과 상담 가능 시간을 사용자 위젯에 표시합니다." />
       <TextField label="봇 응답 시간" value={config.operation.botHours} onChange={(value) => updateOperation('botHours', value)} />
       <TextField label="상담 운영시간" value={config.operation.csHours} onChange={(value) => updateOperation('csHours', value)} />
+      <TextField
+        label="최초 답변 목표(운영시간 기준 분)"
+        value={String(config.operation.supportSchedule?.firstResponseTargetMinutes ?? 240)}
+        onChange={(value) => onUpdate((current) => ({
+          ...current,
+          operation: {
+            ...current.operation,
+            supportSchedule: {
+              timezone: current.operation.supportSchedule?.timezone ?? 'Asia/Seoul',
+              weekly: current.operation.supportSchedule?.weekly ?? {},
+              holidays: current.operation.supportSchedule?.holidays ?? [],
+              firstResponseTargetMinutes: Math.max(1, Number(value) || 240),
+            },
+          },
+        }))}
+      />
     </section>
   );
 }
@@ -662,10 +692,10 @@ function SearchQualityPanel({
   const [evaluation, setEvaluation] = useState<EvaluationMetrics>();
   const result = useMemo(() => (query.trim() ? searchKnowledge(query, config) : null), [config, query]);
   const matchedItem = result?.item ?? result?.suggestions[0];
-  const events = useMemo(
-    () => loadConversationEvents().filter((event) => event.botId === config.bot.id),
-    [config.bot.id, eventVersion],
-  );
+  const events = useMemo(() => {
+    void eventVersion;
+    return loadConversationEvents().filter((event) => event.botId === config.bot.id);
+  }, [config.bot.id, eventVersion]);
   const lowConfidenceCount = events.filter((event) => event.confidence === 'low').length;
   const negativeFeedbackCount = events.filter((event) => event.feedback === 'not-helpful').length;
   const smallTalkCount = events.filter((event) => event.interactionType === 'smalltalk' || event.status === 'smalltalk').length;
@@ -857,9 +887,10 @@ function DataPortabilityPanel({
   const selectedConfig = botConfigs[selectedBotId];
   const events = loadConversationEvents();
   const tickets = loadTickets();
-  const scriptSnippet = `<script src="/widget.js" data-bot-id="${selectedBotId}"></script>`;
-  const initSnippet = `<script src="/widget.js" data-auto-init="false"></script>
-<script>
+  const scriptSnippet = `<script type="module" src="/widget.js" data-bot-id="${selectedBotId}"></script>`;
+  const initSnippet = `<script type="module" src="/widget.js" data-auto-init="false"></script>
+<script type="module">
+  await window.ChatplateReady;
   window.Chatplate.init({ botId: "${selectedBotId}" });
 </script>`;
 
@@ -989,27 +1020,50 @@ function TicketInboxPanel({
   const [selectedConversationId, setSelectedConversationId] = useState('');
   const [bundle, setBundle] = useState<SupportConversationBundle>();
   const [notes, setNotes] = useState<SupportInternalNote[]>([]);
+  const [auditEvents, setAuditEvents] = useState<SupportAuditEvent[]>([]);
+  const [savedReplies, setSavedReplies] = useState<SupportSavedReply[]>([]);
+  const [members, setMembers] = useState<AdminProfile[]>([]);
+  const [transferTo, setTransferTo] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | SupportConversation['status']>('all');
+  const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'unassigned' | 'mine'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [reply, setReply] = useState('');
+  const [savedReplyTitle, setSavedReplyTitle] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState<string>();
   const [isWorking, setIsWorking] = useState(false);
 
   const refreshInbox = useCallback(async () => {
-    const next = (await repository.listConversations(config.bot.id))
+    const page = await repository.queryConversations({
+      botId: config.bot.id,
+      assignment: assignmentFilter,
+      adminId: admin.id,
+      search: deferredSearchQuery,
+      limit: 100,
+    });
+    const next = page.items
       .filter((conversation) => conversation.status !== 'bot_active');
     setConversations(next);
-    setSelectedConversationId((current) => current || next[0]?.id || '');
-  }, [config.bot.id, repository]);
+    setSelectedConversationId((current) =>
+      next.some((conversation) => conversation.id === current) ? current : next[0]?.id ?? '',
+    );
+  }, [admin.id, assignmentFilter, config.bot.id, deferredSearchQuery, repository]);
 
   const refreshSelected = useCallback(async (conversationId: string) => {
-    const [nextBundle, nextNotes] = await Promise.all([
+    const [nextBundle, nextNotes, nextAuditEvents, nextSavedReplies, nextMembers] = await Promise.all([
       repository.loadConversation(conversationId),
       repository.listInternalNotes(conversationId),
+      repository.listAuditEvents(conversationId),
+      repository.listSavedReplies(config.bot.id),
+      repository.listAdmins(),
     ]);
     setBundle(nextBundle ?? undefined);
     setNotes(nextNotes);
-  }, [repository]);
+    setAuditEvents(nextAuditEvents);
+    setSavedReplies(nextSavedReplies);
+    setMembers(nextMembers.filter((member) => member.active));
+  }, [config.bot.id, repository]);
 
   useEffect(() => {
     void refreshInbox().catch((nextError: unknown) => {
@@ -1104,6 +1158,27 @@ function TicketInboxPanel({
         ))}
       </div>
 
+      <div className="support-inbox-tools">
+        <label>
+          <Search size={15} aria-hidden="true" />
+          <input
+            value={searchQuery}
+            type="search"
+            placeholder="고객명, 연락처, 대화 검색"
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+        </label>
+        <select
+          value={assignmentFilter}
+          aria-label="담당자 필터"
+          onChange={(event) => setAssignmentFilter(event.target.value as typeof assignmentFilter)}
+        >
+          <option value="all">전체 담당자</option>
+          <option value="unassigned">미배정</option>
+          <option value="mine">내 상담</option>
+        </select>
+      </div>
+
       <div className="admin-list-layout ticket-layout">
         <div className="admin-item-list">
           {filteredConversations.map((conversation) => (
@@ -1183,6 +1258,33 @@ function TicketInboxPanel({
                   상담 완료
                 </button>
               ) : null}
+              {selectedConversation.assignedTo &&
+              (selectedConversation.assignedTo === admin.id || admin.role === 'owner') ? (
+                <>
+                  <select
+                    value={transferTo}
+                    aria-label="상담 이관 대상"
+                    onChange={(event) => setTransferTo(event.target.value)}
+                  >
+                    <option value="">담당자 이관</option>
+                    {members
+                      .filter((member) => member.id !== selectedConversation.assignedTo)
+                      .map((member) => <option value={member.id} key={member.id}>{member.displayName}</option>)}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!transferTo || isWorking}
+                    onClick={() => {
+                      const target = members.find((member) => member.id === transferTo);
+                      if (!target) return;
+                      setTransferTo('');
+                      void runAction(() => repository.transferConversation(selectedConversation.id, admin, target));
+                    }}
+                  >
+                    이관
+                  </button>
+                </>
+              ) : null}
             </div>
 
             <form
@@ -1209,9 +1311,42 @@ function TicketInboxPanel({
                 placeholder={canReply ? '고객에게 보낼 답변을 입력하세요.' : '담당하기 후 답변할 수 있습니다.'}
                 onChange={(event) => setReply(event.target.value)}
               />
+              {savedReplies.length ? (
+                <select
+                  aria-label="저장 답변"
+                  defaultValue=""
+                  onChange={(event) => {
+                    const savedReply = savedReplies.find((entry) => entry.id === event.target.value);
+                    if (savedReply) setReply(savedReply.body);
+                    event.target.value = '';
+                  }}
+                >
+                  <option value="">저장 답변 불러오기</option>
+                  {savedReplies.map((entry) => <option value={entry.id} key={entry.id}>{entry.title}</option>)}
+                </select>
+              ) : null}
               <button type="submit" disabled={!canReply || !reply.trim() || isWorking}>
                 <Send size={15} aria-hidden="true" /> 답변 보내기
               </button>
+              <div className="support-save-reply">
+                <input
+                  value={savedReplyTitle}
+                  placeholder="현재 내용을 저장할 제목"
+                  onChange={(event) => setSavedReplyTitle(event.target.value)}
+                />
+                <button
+                  type="button"
+                  disabled={!savedReplyTitle.trim() || !reply.trim() || isWorking}
+                  onClick={() => {
+                    const title = savedReplyTitle.trim();
+                    const body = reply.trim();
+                    setSavedReplyTitle('');
+                    void runAction(() => repository.saveReply(config.bot.id, admin, title, body));
+                  }}
+                >
+                  저장 답변 추가
+                </button>
+              </div>
             </form>
 
             <section className="support-notes">
@@ -1235,6 +1370,17 @@ function TicketInboxPanel({
               </div>
             </section>
 
+            <section className="support-audit">
+              <strong>상담 이력</strong>
+              {auditEvents.map((event) => (
+                <p key={event.id}>
+                  <span>{event.action}</span>
+                  <time>{new Date(event.createdAt).toLocaleString('ko-KR')}</time>
+                </p>
+              ))}
+              {auditEvents.length === 0 ? <small>기록된 상태 변경이 없습니다.</small> : null}
+            </section>
+
             <button className="admin-add-button" type="button" onClick={createFaqDraft}>
               <Plus size={15} aria-hidden="true" /> FAQ 초안 생성
             </button>
@@ -1242,6 +1388,84 @@ function TicketInboxPanel({
         ) : (
           <EmptyState text="상담 대화를 선택해 주세요." />
         )}
+      </div>
+    </section>
+  );
+}
+
+function TeamPanel({ repository, admin }: { repository: ChatRepository; admin: AdminProfile }) {
+  const [members, setMembers] = useState<AdminProfile[]>([]);
+  const [email, setEmail] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [role, setRole] = useState<AdminProfile['role']>('operator');
+  const [message, setMessage] = useState<string>();
+
+  const refresh = useCallback(async () => {
+    setMembers(await repository.listAdmins());
+  }, [repository]);
+
+  useEffect(() => {
+    void refresh().catch((error: unknown) => {
+      setMessage(error instanceof Error ? error.message : '상담원 목록을 불러오지 못했습니다.');
+    });
+  }, [refresh]);
+
+  if (admin.role !== 'owner') {
+    return (
+      <section className="admin-panel">
+        <PanelHeader title="상담원 관리" description="소유자만 상담원을 초대하거나 비활성화할 수 있습니다." />
+        <EmptyState text="이 화면에 접근할 권한이 없습니다." />
+      </section>
+    );
+  }
+
+  return (
+    <section className="admin-panel">
+      <PanelHeader title="상담원 관리" description="초기 1~5명 운영팀의 계정과 역할을 관리합니다." />
+      {message ? <p className="data-status" role="status">{message}</p> : null}
+      <form
+        className="team-invite"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!email.trim() || !displayName.trim()) return;
+          void repository.inviteAdmin(email.trim(), displayName.trim(), role)
+            .then(() => {
+              setEmail('');
+              setDisplayName('');
+              setMessage('초대 메일을 요청했습니다.');
+              return refresh();
+            })
+            .catch((error: unknown) => {
+              setMessage(error instanceof Error ? error.message : '상담원을 초대하지 못했습니다.');
+            });
+        }}
+      >
+        <input value={displayName} placeholder="상담원 이름" onChange={(event) => setDisplayName(event.target.value)} />
+        <input value={email} type="email" placeholder="name@example.com" onChange={(event) => setEmail(event.target.value)} />
+        <select value={role} onChange={(event) => setRole(event.target.value as AdminProfile['role'])}>
+          <option value="operator">상담원</option>
+          <option value="owner">소유자</option>
+        </select>
+        <button type="submit">상담원 초대</button>
+      </form>
+      <div className="team-list">
+        {members.map((member) => (
+          <article key={member.id}>
+            <div>
+              <strong>{member.displayName}</strong>
+              <span>{member.email} · {member.role === 'owner' ? '소유자' : '상담원'}</span>
+            </div>
+            <button
+              type="button"
+              disabled={member.id === admin.id}
+              onClick={() => {
+                void repository.setAdminActive(member.id, !member.active).then(refresh);
+              }}
+            >
+              {member.active ? '비활성화' : '활성화'}
+            </button>
+          </article>
+        ))}
       </div>
     </section>
   );
@@ -1297,6 +1521,7 @@ function renderActivePanel(
   if (activeView === 'smallTalk') return <SmallTalkEditor config={config} onUpdate={onUpdate} />;
   if (activeView === 'quality') return <SearchQualityPanel config={config} unknownQuestions={unknownQuestions} onUpdate={onUpdate} />;
   if (activeView === 'tickets') return <TicketInboxPanel config={config} repository={repository} admin={admin} onUpdate={onUpdate} />;
+  if (activeView === 'team') return <TeamPanel repository={repository} admin={admin} />;
   if (activeView === 'data') return <DataPortabilityPanel botConfigs={botConfigs} selectedBotId={selectedBotId} onReplaceBotConfigs={onReplaceBotConfigs} />;
   return <UnknownQuestionsPanel questions={unknownQuestions} />;
 }
@@ -1310,6 +1535,10 @@ export function AdminWorkspace({
   onReplaceBotConfigs,
   onResetBot,
   onUnknownQuestion,
+  releaseState,
+  onSaveDraft,
+  onPublishDraft,
+  onRollback,
 }: AdminWorkspaceProps) {
   const [activeView, setActiveView] = useState<AdminPanelView>('bot');
   const [isPreviewOpen, setIsPreviewOpen] = useState(true);
@@ -1369,6 +1598,33 @@ export function AdminWorkspace({
       />
 
       <div className="admin-content">
+        <section className="config-release-bar" aria-label="봇 설정 배포">
+          <div>
+            <strong>고객 노출 버전 {releaseState.publishedVersion ? `v${releaseState.publishedVersion}` : '없음'}</strong>
+            <span>
+              {releaseState.message ??
+                (releaseState.draftVersion ? `저장된 초안 v${releaseState.draftVersion}` : '변경 후 초안을 저장하세요.')}
+            </span>
+          </div>
+          <button type="button" disabled={releaseState.isWorking} onClick={onSaveDraft}>초안 저장</button>
+          <button type="button" disabled={releaseState.isWorking} onClick={onPublishDraft}>고객에게 배포</button>
+          {releaseState.archivedVersions?.length ? (
+            <select
+              aria-label="이전 설정으로 롤백"
+              defaultValue=""
+              disabled={releaseState.isWorking}
+              onChange={(event) => {
+                if (event.target.value) onRollback(Number(event.target.value));
+                event.target.value = '';
+              }}
+            >
+              <option value="">이전 버전 롤백</option>
+              {releaseState.archivedVersions.map((version) => (
+                <option value={version} key={version}>v{version}</option>
+              ))}
+            </select>
+          ) : null}
+        </section>
         {renderActivePanel(
           activeView,
           selectedConfig,

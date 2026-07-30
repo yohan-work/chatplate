@@ -109,6 +109,56 @@
   align-content: start;
 }
 
+.config-release-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+
+.config-release-bar > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.config-release-bar strong,
+.config-release-bar span {
+  display: block;
+}
+
+.config-release-bar span {
+  margin-top: 2px;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+
+.config-release-bar button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+  font-weight: 800;
+}
+
+.config-release-bar select {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.config-release-bar button:last-child {
+  border-color: var(--color-primary);
+  color: #fff;
+  background: var(--color-primary);
+}
+
 .admin-panel {
   display: grid;
   gap: 16px;
@@ -658,6 +708,140 @@
   border-radius: 16px;
   background: var(--color-surface-soft);
   content-visibility: auto;
+}
+
+.support-inbox-tools {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.support-inbox-tools label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.support-inbox-tools input,
+.support-inbox-tools select,
+.support-reply select {
+  min-height: 38px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.support-actions select {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.support-save-reply {
+  display: flex;
+  gap: 8px;
+}
+
+.support-save-reply input {
+  min-width: 0;
+  flex: 1;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.support-inbox-tools input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+}
+
+.support-inbox-tools select,
+.support-reply select {
+  padding: 0 10px;
+}
+
+.support-audit {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.support-audit p {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+
+.support-audit time {
+  white-space: nowrap;
+}
+
+.team-invite {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.team-invite input,
+.team-invite select,
+.team-invite button {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.team-invite input,
+.team-invite select {
+  min-width: 0;
+  width: 100%;
+}
+
+.team-list {
+  display: grid;
+  gap: 8px;
+}
+
+.team-list article {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.team-list article > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.team-list strong,
+.team-list span {
+  display: block;
+}
+
+.team-list span {
+  margin-top: 3px;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
 }
 
 .support-thread__message {
