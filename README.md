@@ -1,6 +1,6 @@
 # Chatplate
 
-JSON knowledge 데이터를 교체해 여러 도메인에 붙일 수 있는 고객 상담 챗봇 위젯 MVP입니다. OpenAI API나 LLM을 호출하지 않고, 미리 등록된 질문/키워드/별칭 데이터를 scoring해서 답변합니다.
+JSON knowledge 데이터를 교체해 여러 도메인에 붙일 수 있는 고객 상담 챗봇 위젯입니다. OpenAI API나 LLM을 호출하지 않고, 미리 등록된 질문/키워드/별칭 데이터를 scoring해서 답변합니다. 등록 데이터로 해결하지 못한 대화는 상담원이 같은 채팅 스레드를 이어받습니다.
 
 ## 실행
 
@@ -84,7 +84,36 @@ npm run build
 
 ## 상담 티켓 운영
 
-사용자가 상담 요청 폼을 제출하면 브라우저 localStorage에 티켓이 저장됩니다. 관리자 콘솔의 `문의함` 탭에서 상태, 우선순위, 관리자 메모를 관리하고 반복 문의는 FAQ 초안으로 전환할 수 있습니다.
+기본 개발 모드는 `VITE_CHAT_REPOSITORY=local`입니다. 고객 대화가 브라우저 localStorage에 저장되므로 고객·관리자 흐름을 한 브라우저에서 시연할 수 있습니다.
+
+실사용 환경은 Supabase adapter를 사용합니다.
+
+```bash
+cp .env.example .env.local
+```
+
+```env
+VITE_CHAT_REPOSITORY=supabase
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+```
+
+`supabase/migrations/202607300001_support_chat.sql`을 적용하고 Supabase Auth에서 anonymous sign-in을 활성화합니다. 최초 관리자는 Auth 사용자를 생성한 뒤 같은 UUID로 `profiles`에 owner를 등록합니다.
+
+```sql
+insert into public.profiles (id, display_name, email, role)
+values ('AUTH_USER_UUID', '대표 관리자', 'owner@example.com', 'owner');
+```
+
+### 채팅상담 흐름
+
+1. 익명 방문자는 등록 FAQ의 자동응답을 받습니다.
+2. fallback, 낮은 신뢰도, 부정 피드백, 상담원 요청에서 연락처와 동의를 받고 `waiting`으로 전환합니다.
+3. 관리자가 `문의함`에서 대화를 선점하면 `human_active`가 되고, 이때부터 봇은 응답하지 않습니다.
+4. 상담원 답변은 같은 위젯에 실시간 표시됩니다.
+5. 상담 완료 후 고객이 메시지를 보내면 같은 스레드가 다시 열립니다.
+
+관리자 내부 메모는 고객 메시지와 별도 저장됩니다. 기존 localStorage `Ticket` 데이터는 호환 내보내기 용도로만 유지되며 새 채팅상담에는 사용하지 않습니다.
 
 ## 향후 확장
 
