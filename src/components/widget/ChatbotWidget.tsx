@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Bot, History, SquarePen, X } from 'lucide-react';
 import { getFallbackSuggestions } from '../../engine/getFallbackSuggestions';
@@ -30,6 +30,7 @@ import type { ChatRepository } from '../../services/chatRepository';
 import { getChatRepository } from '../../services/getChatRepository';
 import { getAnalyticsRepository } from '../../services/analyticsRepository';
 import { calculateFirstResponseDueAt } from '../../services/calculateFirstResponseDueAt';
+import { waitForMinimumResponseDelay } from '../../utils/minimumResponseDelay';
 import { BottomNavigation } from './BottomNavigation';
 import { HomeView } from '../home/HomeView';
 import { ChatView } from '../chat/ChatView';
@@ -87,7 +88,9 @@ export function ChatbotWidget({
   const [supportConversation, setSupportConversation] = useState<SupportConversation>();
   const [conversationHistory, setConversationHistory] = useState<SupportConversation[]>([]);
   const [isSyncing, setIsSyncing] = useState(true);
+  const [isThinking, setIsThinking] = useState(false);
   const [syncError, setSyncError] = useState<string>();
+  const automatedResponseRequestId = useRef(0);
   const repository = useMemo(() => chatRepository ?? getChatRepository('visitor'), [chatRepository]);
   const analyticsRepository = useMemo(() => getAnalyticsRepository('visitor'), []);
 
@@ -143,6 +146,8 @@ export function ChatbotWidget({
     let cancelled = false;
 
     const initialize = async () => {
+      automatedResponseRequestId.current += 1;
+      setIsThinking(false);
       setIsSyncing(true);
       setSyncError(undefined);
       setActiveView('home');
@@ -233,6 +238,15 @@ export function ChatbotWidget({
 
   const handleQuestionSelect = async (item: KnowledgeItem) => {
     if (!supportConversation || isSyncing) return;
+    const hasAutomatedResponse = supportConversation.status === 'bot_active';
+    const responseStartedAt = Date.now();
+    const minimumDelay = hasAutomatedResponse
+      ? waitForMinimumResponseDelay(responseStartedAt)
+      : undefined;
+    const requestId = hasAutomatedResponse
+      ? ++automatedResponseRequestId.current
+      : undefined;
+    if (requestId !== undefined) setIsThinking(true);
     if (item.intentId) setSelectedIntentId(item.intentId);
     setConversationContext((current) => ({
       lastIntentId: item.intentId,
@@ -248,27 +262,39 @@ export function ChatbotWidget({
     }
     setActiveView('chat');
     const userMessage = createMessage('user', item.question, { id: createClientMessageId('visitor') });
-    const nextMessages = [userMessage];
-    if (supportConversation.status === 'bot_active') {
-      nextMessages.push(createMessage('bot', item.answer, {
+    const botMessage = hasAutomatedResponse
+      ? createMessage('bot', item.answer, {
         id: createClientMessageId('answer'),
         buttons: item.buttons,
         matchedKnowledgeIds: [item.id],
         handoffCta: Boolean(item.handoffRecommended),
-      }));
-    }
-    setMessages((current) => [...current, ...nextMessages]);
+      })
+      : undefined;
+    setMessages((current) => [...current, userMessage]);
     setIsSyncing(true);
     setSyncError(undefined);
     try {
       await persistMessage(supportConversation.id, userMessage, 'visitor');
-      if (nextMessages[1]) await persistMessage(supportConversation.id, nextMessages[1], 'bot');
+      if (botMessage && minimumDelay && requestId !== undefined) {
+        await minimumDelay;
+        if (automatedResponseRequestId.current === requestId) {
+          setIsThinking(false);
+          setMessages((current) => [...current, botMessage]);
+        }
+        await persistMessage(supportConversation.id, botMessage, 'bot');
+        if (automatedResponseRequestId.current !== requestId) return;
+      }
       await refreshConversation(supportConversation.id);
       await refreshConversationHistory();
     } catch (error) {
-      setSyncError(error instanceof Error ? error.message : '메시지를 저장하지 못했습니다.');
+      if (requestId === undefined || automatedResponseRequestId.current === requestId) {
+        setSyncError(error instanceof Error ? error.message : '메시지를 저장하지 못했습니다.');
+      }
     } finally {
-      setIsSyncing(false);
+      if (requestId === undefined || automatedResponseRequestId.current === requestId) {
+        setIsThinking(false);
+        setIsSyncing(false);
+      }
     }
   };
 
@@ -323,6 +349,15 @@ export function ChatbotWidget({
 
   const handleSubmit = async (query: string) => {
     if (!supportConversation || isSyncing) return;
+    const hasAutomatedResponse = supportConversation.status === 'bot_active';
+    const responseStartedAt = Date.now();
+    const minimumDelay = hasAutomatedResponse
+      ? waitForMinimumResponseDelay(responseStartedAt)
+      : undefined;
+    const requestId = hasAutomatedResponse
+      ? ++automatedResponseRequestId.current
+      : undefined;
+    if (requestId !== undefined) setIsThinking(true);
     setIsSyncing(true);
     setSyncError(undefined);
     const userMessage = createMessage('user', query, {
@@ -410,24 +445,34 @@ export function ChatbotWidget({
         }
       }
 
-      setMessages((current) => [...current, botMessage]);
+      if (minimumDelay && requestId !== undefined) await minimumDelay;
+      if (requestId !== undefined && automatedResponseRequestId.current === requestId) {
+        setIsThinking(false);
+        setMessages((current) => [...current, botMessage]);
+      }
       await persistMessage(supportConversation.id, botMessage, 'bot');
+      if (requestId !== undefined && automatedResponseRequestId.current !== requestId) return;
       await refreshConversation(supportConversation.id);
       await refreshConversationHistory();
       onConversationChanged?.();
     } catch (error) {
-      setMessages((current) => current.map((message) =>
-        message.id === userMessage.id
-          ? {
-            ...message,
-            deliveryStatus: 'failed',
-            failureReason: error instanceof Error ? error.message : '메시지를 전송하지 못했습니다.',
-          }
-          : message,
-      ));
-      setSyncError(error instanceof Error ? error.message : '메시지를 전송하지 못했습니다.');
+      if (requestId === undefined || automatedResponseRequestId.current === requestId) {
+        setMessages((current) => current.map((message) =>
+          message.id === userMessage.id
+            ? {
+              ...message,
+              deliveryStatus: 'failed',
+              failureReason: error instanceof Error ? error.message : '메시지를 전송하지 못했습니다.',
+            }
+            : message,
+        ));
+        setSyncError(error instanceof Error ? error.message : '메시지를 전송하지 못했습니다.');
+      }
     } finally {
-      setIsSyncing(false);
+      if (requestId === undefined || automatedResponseRequestId.current === requestId) {
+        setIsThinking(false);
+        setIsSyncing(false);
+      }
     }
   };
 
@@ -461,6 +506,8 @@ export function ChatbotWidget({
   };
 
   const resetConversation = async () => {
+    automatedResponseRequestId.current += 1;
+    setIsThinking(false);
     setIsSyncing(true);
     setSyncError(undefined);
     try {
@@ -553,6 +600,7 @@ export function ChatbotWidget({
             onClarificationSelect={handleClarificationSelect}
             conversationStatus={supportConversation?.status}
             isSyncing={isSyncing}
+            isThinking={isThinking}
             syncError={syncError}
             onRetryMessage={(message) => {
               setMessages((current) => current.filter((entry) => entry.id !== message.id));
@@ -566,6 +614,8 @@ export function ChatbotWidget({
             conversations={conversationHistory}
             activeConversationId={supportConversation?.id}
             onOpenChat={(conversationId) => {
+              automatedResponseRequestId.current += 1;
+              setIsThinking(false);
               setIsSyncing(true);
               void refreshConversation(conversationId)
                 .then(() => {

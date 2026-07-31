@@ -11,6 +11,7 @@ import { findKnowledgeById } from '../../engine/searchKnowledge';
 import { ChatBubble } from './ChatBubble';
 import { ChatInput } from './ChatInput';
 import { ContactRequestForm } from './ContactRequestForm';
+import { ThinkingIndicator } from './ThinkingIndicator';
 
 export interface ContactRequestContext {
   source: TicketSource;
@@ -33,6 +34,7 @@ interface ChatViewProps {
   onClarificationSelect: (option: ClarificationOption) => void;
   conversationStatus?: ConversationStatus;
   isSyncing?: boolean;
+  isThinking?: boolean;
   syncError?: string;
   onRetryMessage: (message: ChatMessage) => void;
 }
@@ -51,6 +53,7 @@ export function ChatView({
   onClarificationSelect,
   conversationStatus = 'bot_active',
   isSyncing = false,
+  isThinking = false,
   syncError,
   onRetryMessage,
 }: ChatViewProps) {
@@ -81,6 +84,7 @@ export function ChatView({
             onRetry={onRetryMessage}
           />
         ))}
+        {isThinking ? <ThinkingIndicator /> : null}
         {contactRequest ? (
           <ContactRequestForm
             botConfig={botConfig}
