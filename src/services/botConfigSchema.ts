@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { BotConfig } from '../types/chatbot';
+import { validateSupportSchedule } from './supportOperations';
 
 const nonEmpty = z.string().trim().min(1);
 const answerButtonSchema = z.object({
@@ -75,6 +76,15 @@ export const botConfigSchema = z.object({
   quickReplies: z.array(z.object({ label: nonEmpty, knowledgeId: nonEmpty })),
   knowledge: z.array(knowledgeSchema),
 }).passthrough().superRefine((config, context) => {
+  if (config.operation.supportSchedule) {
+    for (const message of validateSupportSchedule(config.operation.supportSchedule)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['operation', 'supportSchedule'],
+        message,
+      });
+    }
+  }
   const categoryIds = new Set(config.categories.map((category) => category.id));
   const knowledgeIds = new Set<string>();
   for (const item of config.knowledge) {

@@ -38,4 +38,26 @@ describe('LocalBotConfigRepository', () => {
       'owner',
     )).rejects.toThrow('CONFIG_VERSION_CONFLICT');
   });
+
+  it('rejects invalid structured support schedules before saving a draft', async () => {
+    const repository = new LocalBotConfigRepository(createStorage());
+    const config = botConfigs['coach-myway'];
+    await expect(repository.saveDraft('coach-myway', null, {
+      ...config,
+      operation: {
+        ...config.operation,
+        supportSchedule: {
+          timezone: 'Asia/Seoul',
+          weekly: {
+            mon: [
+              { start: '10:00', end: '18:00' },
+              { start: '17:00', end: '19:00' },
+            ],
+          },
+          holidays: [],
+          firstResponseTargetMinutes: 240,
+        },
+      },
+    }, 'owner')).rejects.toThrow('운영시간이 서로 겹칩니다');
+  });
 });
