@@ -2,12 +2,14 @@ import { resolveSmallTalkConfig } from '../data/smallTalkDefaults';
 import type {
   BotConfig,
   ConversationContext,
+  ConversationEngineVariant,
   ConversationResolution,
   SmallTalkConfig,
   SmallTalkIntentId,
   SmallTalkRule,
 } from '../types/chatbot';
 import { composeResponsePlan } from './composeResponsePlan';
+import { isClearlyUnsupportedQuery } from './detectUnsupportedQuery';
 import { normalizeText } from './normalizeText';
 import { extractQueryFeatures } from './queryFeatures';
 import { routeConversationQuery } from './routeConversationQuery';
@@ -121,8 +123,9 @@ function knowledgeResolution(
   botConfig: BotConfig,
   intentId?: string,
   context?: ConversationContext,
+  variant?: ConversationEngineVariant,
 ): ConversationResolution {
-  const route = routeConversationQuery(effectiveQuery, botConfig, { intentId, context });
+  const route = routeConversationQuery(effectiveQuery, botConfig, { intentId, context, variant });
   const searchResult = route.result;
   return {
     kind: searchResult.status === 'fallback' ? 'fallback' : 'knowledge',
@@ -195,10 +198,12 @@ export function validateSmallTalkConfig(config: SmallTalkConfig): string[] {
 export function resolveConversation(
   query: string,
   botConfig: BotConfig,
-  options?: { intentId?: string; context?: ConversationContext },
+  options?: { intentId?: string; context?: ConversationContext; variant?: ConversationEngineVariant },
 ): ConversationResolution {
   const smallTalk = resolveSmallTalkConfig(botConfig.bot, botConfig.smallTalk);
-  if (!smallTalk.enabled) return knowledgeResolution(query, query, botConfig, options?.intentId, options?.context);
+  if (!smallTalk.enabled) {
+    return knowledgeResolution(query, query, botConfig, options?.intentId, options?.context, options?.variant);
+  }
 
   const rules = normalizedRules(smallTalk);
   const normalized = normalizeText(query);
@@ -206,6 +211,28 @@ export function resolveConversation(
   const compact = normalized.replace(/\s/g, '');
   if ((!normalized || query.length > MAX_INPUT_LENGTH || REPEATED_CHARACTER.test(compact)) && noiseRule) {
     return smallTalkResolution(query, normalized, noiseRule);
+  }
+
+  if (options?.variant !== 'baseline' && isClearlyUnsupportedQuery(query)) {
+    return {
+      kind: 'fallback',
+      originalQuery: query,
+      effectiveQuery: normalized,
+      searchResult: {
+        status: 'fallback',
+        confidence: 'low',
+        score: 0,
+        suggestions: [],
+        alternatives: [],
+        matchedFields: [],
+        decisionReason: 'low-similarity',
+      },
+      routeDecision: {
+        mode: 'fallback',
+        reason: 'both-low',
+        standaloneScore: 0,
+      },
+    };
   }
 
   const priorityRule = rules.find((rule) =>
@@ -219,8 +246,8 @@ export function resolveConversation(
   const stripped = stripSocialWrappers(normalized, rules);
   if (stripped.query !== normalized) {
     if (!stripped.query && stripped.matchedRule) return smallTalkResolution(query, normalized, stripped.matchedRule);
-    return knowledgeResolution(query, stripped.query, botConfig, options?.intentId, options?.context);
+    return knowledgeResolution(query, stripped.query, botConfig, options?.intentId, options?.context, options?.variant);
   }
 
-  return knowledgeResolution(query, query, botConfig, options?.intentId, options?.context);
+  return knowledgeResolution(query, query, botConfig, options?.intentId, options?.context, options?.variant);
 }

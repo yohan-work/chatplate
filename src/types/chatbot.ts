@@ -265,6 +265,7 @@ export interface ResponsePlan {
 }
 
 export type ConversationRouteMode = 'standalone' | 'contextual' | 'clarification' | 'fallback';
+export type ConversationEngineVariant = 'baseline' | 'candidate';
 
 export interface ConversationRouteDecision {
   mode: ConversationRouteMode;

@@ -55,7 +55,11 @@ function typoScore(query: string, values: string[]): number {
 
 export function rankKnowledge(analysis: QueryAnalysis, entries: SearchIndexEntry[], intentId?: string): RankedKnowledge[] {
   const features = extractQueryFeatures(analysis.normalized);
-  const queryTokens = [...new Set([...tokenize(analysis.normalized), ...features.stems, ...analysis.synonymTokens])];
+  const queryTokens = [...new Set([
+    ...tokenize(analysis.normalized),
+    ...tokenize(features.stems.join(' ')),
+    ...analysis.synonymTokens.flatMap((token) => tokenize(token)),
+  ])];
   const queryNgrams = ngrams(analysis.normalized);
   const queryJamoNgrams = ngrams(features.jamoText);
   const bm25 = bm25Scores(queryTokens, entries.map((entry) => entry.documentTokens));

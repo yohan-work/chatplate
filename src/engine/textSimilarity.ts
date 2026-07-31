@@ -1,6 +1,11 @@
 import { normalizeText } from './normalizeText';
 
-const STOPWORDS = new Set(['가능한가요', '궁금해요', '알려주세요', '어떻게', '있나요', '하나요', '싶어요', '되나요', '뭐예요', '어떤']);
+const STOPWORDS = new Set([
+  '가능한가요', '가능해요', '궁금해요', '궁금합니다', '알려주세요', '알려줘요', '알려줘',
+  '어떻게', '있나요', '하나요', '싶어요', '되나요', '돼요', '뭐예요', '어떤', '무엇',
+  '관련해서', '문의', '문의드려요', '확인하고', '확인해', '받을', '하는', '해도', '할까요',
+  '그리고', '그럼', '혹시', '먼저', '지금', '정확히', '자세히',
+]);
 
 export function tokenize(value: string): string[] {
   return normalizeText(value).split(' ').filter((token) => token.length >= 2 && !STOPWORDS.has(token));

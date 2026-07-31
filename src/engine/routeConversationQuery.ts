@@ -1,6 +1,7 @@
 import type {
   BotConfig,
   ConversationContext,
+  ConversationEngineVariant,
   ConversationRouteDecision,
   ConversationRouteMode,
   KnowledgeItem,
@@ -88,9 +89,9 @@ function referenceCandidates(botConfig: BotConfig, context: ConversationContext)
 export function routeConversationQuery(
   query: string,
   botConfig: BotConfig,
-  options?: { intentId?: string; context?: ConversationContext; now?: number },
+  options?: { intentId?: string; context?: ConversationContext; now?: number; variant?: ConversationEngineVariant },
 ): ConversationQueryRoute {
-  const standalone = searchKnowledge(query, botConfig, { intentId: options?.intentId });
+  const standalone = searchKnowledge(query, botConfig, { intentId: options?.intentId, variant: options?.variant });
   const context = options?.context;
   const now = options?.now ?? Date.now();
   if (!context || now - context.updatedAt > CONTEXT_TTL_MS) {
@@ -106,6 +107,7 @@ export function routeConversationQuery(
   const enrichedQuery = contextualQuery(query, context);
   const contextual = searchKnowledge(enrichedQuery, botConfig, {
     intentId: context.lastIntentId ?? options?.intentId,
+    variant: options?.variant,
   });
   const standaloneItem = leadingItem(standalone);
   const contextualItem = leadingItem(contextual);

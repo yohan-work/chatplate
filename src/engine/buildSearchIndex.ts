@@ -36,6 +36,9 @@ export function buildSearchIndex(botConfig: BotConfig): SearchIndexEntry[] {
       const utterances = (item.utterances ?? [])
         .filter((utterance) => !utterance.split || utterance.split === 'train')
         .map((utterance) => normalizeText(utterance.text));
+      const approvedUtterances = (item.utterances ?? [])
+        .filter((utterance) => (!utterance.split || utterance.split === 'train') && utterance.approved)
+        .map((utterance) => normalizeText(utterance.text));
       const keywords = item.keywords.map(normalizeText);
       const tags = (item.tags ?? []).map(normalizeText);
       const negativeKeywords = (item.negativeKeywords ?? []).map(normalizeText);
@@ -49,14 +52,14 @@ export function buildSearchIndex(botConfig: BotConfig): SearchIndexEntry[] {
         aliases,
         aliasesCompact: aliases.map((alias) => alias.replace(/\s/g, '')),
         utterances,
-        utteranceNgrams: [question, ...aliases, ...utterances].map(ngrams),
-        utteranceJamoNgrams: [question, ...aliases, ...utterances].map((value) => ngrams(toJamo(value))),
+        utteranceNgrams: [question, ...aliases, ...approvedUtterances].map(ngrams),
+        utteranceJamoNgrams: [question, ...aliases, ...approvedUtterances].map((value) => ngrams(toJamo(value))),
         keywords,
         tags,
         negativeKeywords,
         categoryName,
         searchableText,
-        documentTokens: tokenize(searchableText),
+        documentTokens: tokenize([question, ...aliases, ...approvedUtterances, ...keywords, ...tags, categoryName].join(' ')),
       };
     });
 

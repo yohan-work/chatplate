@@ -1,17 +1,44 @@
-import type { BotConfig, KnowledgeItem, SearchResult } from '../types/chatbot';
+import type { BotConfig, ConversationEngineVariant, KnowledgeItem, SearchResult } from '../types/chatbot';
 import { analyzeQuery } from './analyzeQuery';
 import { buildSearchIndex } from './buildSearchIndex';
 import { composeMultiIntentItems, decideSearchResult, HIGH_CONFIDENCE_THRESHOLD, MEDIUM_CONFIDENCE_THRESHOLD } from './decideSearchResult';
 import { rankKnowledge } from './rankKnowledge';
+import { matchCuratedKnowledgeId } from './curatedIntentMatcher';
 
 export const ANSWER_THRESHOLD = HIGH_CONFIDENCE_THRESHOLD;
 export const SUGGESTION_THRESHOLD = MEDIUM_CONFIDENCE_THRESHOLD;
 
-export function searchKnowledge(query: string, botConfig: BotConfig, options?: { intentId?: string }): SearchResult {
+export function searchKnowledge(
+  query: string,
+  botConfig: BotConfig,
+  options?: { intentId?: string; variant?: ConversationEngineVariant },
+): SearchResult {
   const analysis = analyzeQuery(query, botConfig.search?.synonymGroups);
   const index = buildSearchIndex(botConfig);
   const ranked = rankKnowledge(analysis, index, options?.intentId);
   const result = decideSearchResult(ranked);
+  const curatedKnowledgeId = options?.variant === 'baseline' || result.decisionReason === 'exact'
+    ? undefined
+    : matchCuratedKnowledgeId(query, botConfig.bot.id);
+  const curatedItem = curatedKnowledgeId ? findKnowledgeById(botConfig, curatedKnowledgeId) : undefined;
+  if (curatedItem && (curatedItem.status ?? 'active') === 'active') {
+    const relatedItems = curatedItem.relatedIds
+      .map((id) => findKnowledgeById(botConfig, id))
+      .filter((item): item is KnowledgeItem => Boolean(item))
+      .slice(0, 3);
+    return {
+      status: 'answer',
+      confidence: 'high',
+      score: 0.98,
+      item: curatedItem,
+      items: [curatedItem],
+      suggestions: [curatedItem, ...relatedItems],
+      alternatives: relatedItems,
+      matchedFields: ['intent'],
+      scoreMargin: 0.98,
+      decisionReason: 'confident',
+    };
+  }
 
   if (analysis.intents.length > 1) {
     const intentResults = analysis.intents.map((intent) => {
