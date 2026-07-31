@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ChatbotLauncher } from './components/widget/ChatbotLauncher';
 import { ChatbotWidget } from './components/widget/ChatbotWidget';
@@ -28,9 +28,10 @@ export interface ChatplateInitOptions {
   open?: boolean;
 }
 
-interface MountedWidget {
+export interface MountedWidget {
   root: Root;
   container: HTMLElement;
+  destroy: () => void;
 }
 
 declare global {
@@ -42,17 +43,24 @@ declare global {
   }
 }
 
-function resolveTarget(target?: string | HTMLElement): HTMLElement {
-  if (target instanceof HTMLElement) return target;
+interface ResolvedTarget {
+  container: HTMLElement;
+  ownsContainer: boolean;
+}
+
+const mountedWidgets = new WeakMap<HTMLElement, MountedWidget>();
+
+function resolveTarget(target?: string | HTMLElement): ResolvedTarget {
+  if (target instanceof HTMLElement) return { container: target, ownsContainer: false };
   if (typeof target === 'string') {
     const element = document.querySelector<HTMLElement>(target);
-    if (element) return element;
+    if (element) return { container: element, ownsContainer: false };
   }
 
   const container = document.createElement('div');
   container.dataset.chatplateRoot = 'true';
   document.body.appendChild(container);
-  return container;
+  return { container, ownsContainer: true };
 }
 
 function resolveConfig(options?: ChatplateInitOptions): BotConfig {
@@ -80,47 +88,69 @@ function PublicWidget({
   const [botConfig, setBotConfig] = useState(initialConfig);
   const [isOpen, setIsOpen] = useState(initiallyOpen);
   const [supportUnreadCount, setSupportUnreadCount] = useState(0);
+  const widgetId = useId();
+  const launcherRef = useRef<HTMLButtonElement>(null);
   const unreadCount = botConfig.notices.filter((notice) => notice.unread).length + supportUnreadCount;
 
   useEffect(() => {
     let active = true;
     void loadPublishedBotConfig(botId)
       .then((config) => {
-        if (active && config) setBotConfig(config);
+        if (!active) return;
+        if (config) setBotConfig(config);
         onEvent?.({ type: 'ready', botId });
       })
-      .catch(() => onEvent?.({ type: 'ready', botId }));
+      .catch(() => {
+        if (active) onEvent?.({ type: 'ready', botId });
+      });
     return () => {
       active = false;
     };
   }, [botId, onEvent]);
 
+  const transitionOpen = useCallback((next: boolean) => {
+    if (next === isOpen) return;
+    setIsOpen(next);
+    onEvent?.({ type: next ? 'open' : 'close', botId });
+  }, [botId, isOpen, onEvent]);
+
   return (
     <>
       <ChatbotLauncher
+        buttonRef={launcherRef}
+        controlsId={widgetId}
         isOpen={isOpen}
         unreadCount={unreadCount}
-        onToggle={() => setIsOpen((current) => {
-          const next = !current;
-          onEvent?.({ type: next ? 'open' : 'close', botId });
-          return next;
-        })}
+        onToggle={() => transitionOpen(!isOpen)}
       />
       <ChatbotWidget
+        id={widgetId}
         botConfig={botConfig}
         isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
+        onClose={() => transitionOpen(false)}
         onUnreadChange={setSupportUnreadCount}
+        returnFocusRef={launcherRef}
       />
     </>
   );
 }
 
 export function init(options?: ChatplateInitOptions): MountedWidget {
-  const container = resolveTarget(options?.target);
+  const { container, ownsContainer } = resolveTarget(options?.target);
+  mountedWidgets.get(container)?.destroy();
+
   const root = createRoot(container);
   const botConfig = resolveConfig(options);
   const botId = options?.botId ?? botConfig.bot.id;
+  let destroyed = false;
+
+  const destroy = () => {
+    if (destroyed) return;
+    destroyed = true;
+    root.unmount();
+    if (mountedWidgets.get(container) === mountedWidget) mountedWidgets.delete(container);
+    if (ownsContainer) container.remove();
+  };
 
   root.render(
     <StrictMode>
@@ -133,7 +163,9 @@ export function init(options?: ChatplateInitOptions): MountedWidget {
     </StrictMode>,
   );
 
-  return { root, container };
+  const mountedWidget: MountedWidget = { root, container, destroy };
+  mountedWidgets.set(container, mountedWidget);
+  return mountedWidget;
 }
 
 window.Chatplate = { init };

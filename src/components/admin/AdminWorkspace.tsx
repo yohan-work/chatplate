@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   Bell,
   Bot,
@@ -1828,6 +1828,8 @@ export function AdminWorkspace({
 }: AdminWorkspaceProps) {
   const [activeView, setActiveView] = useState<AdminPanelView>('bot');
   const [isPreviewOpen, setIsPreviewOpen] = useState(true);
+  const previewWidgetId = useId();
+  const previewLauncherRef = useRef<HTMLButtonElement>(null);
   const repository = useMemo(() => getChatRepository('admin'), []);
   const previewRepository = useMemo(() => {
     const values = new Map<string, string>();
@@ -1934,16 +1936,20 @@ export function AdminWorkspace({
         </div>
         <div className="widget-preview__stage">
           <ChatbotLauncher
+            buttonRef={previewLauncherRef}
+            controlsId={previewWidgetId}
             isOpen={isPreviewOpen}
             unreadCount={unreadCount}
             onToggle={() => setIsPreviewOpen((current) => !current)}
           />
           <ChatbotWidget
+            id={previewWidgetId}
             botConfig={selectedConfig}
             isOpen={isPreviewOpen}
             onClose={() => setIsPreviewOpen(false)}
             onUnknownQuestion={onUnknownQuestion}
             chatRepository={previewRepository}
+            returnFocusRef={previewLauncherRef}
           />
         </div>
       </aside>

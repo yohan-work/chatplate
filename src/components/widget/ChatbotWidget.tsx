@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, RefObject } from 'react';
 import { Bot, History, SquarePen, X } from 'lucide-react';
 import { getFallbackSuggestions } from '../../engine/getFallbackSuggestions';
 import { resolveConversation } from '../../engine/resolveConversation';
@@ -40,15 +40,31 @@ import { SettingsView } from '../settings/SettingsView';
 import { NoticeDetailView } from '../notice/NoticeDetailView';
 
 interface ChatbotWidgetProps {
+  id?: string;
   botConfig: BotConfig;
   isOpen: boolean;
   onClose: () => void;
+  returnFocusRef?: RefObject<HTMLButtonElement | null>;
   variant?: 'floating' | 'page';
   onUnknownQuestion?: (question: string) => void;
   onSearchResult?: (query: string, result: SearchResult) => void;
   onConversationChanged?: () => void;
   onUnreadChange?: (count: number) => void;
   chatRepository?: ChatRepository;
+}
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+    .filter((element) => element.getAttribute('aria-hidden') !== 'true');
 }
 
 function createMessage(role: ChatMessage['role'], text: string, extra?: Partial<ChatMessage>): ChatMessage {
@@ -67,9 +83,11 @@ function confidencePrefix(confidence: ChatMessage['confidence']): string {
 }
 
 export function ChatbotWidget({
+  id,
   botConfig,
   isOpen,
   onClose,
+  returnFocusRef,
   onUnknownQuestion,
   onSearchResult,
   onConversationChanged,
@@ -91,6 +109,8 @@ export function ChatbotWidget({
   const [isThinking, setIsThinking] = useState(false);
   const [syncError, setSyncError] = useState<string>();
   const automatedResponseRequestId = useRef(0);
+  const widgetRef = useRef<HTMLElement>(null);
+  const wasOpen = useRef(isOpen);
   const repository = useMemo(() => chatRepository ?? getChatRepository('visitor'), [chatRepository]);
   const analyticsRepository = useMemo(() => getAnalyticsRepository('visitor'), []);
 
@@ -221,15 +241,49 @@ export function ChatbotWidget({
   }, [onUnreadChange, supportConversation?.unreadForVisitor]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (variant !== 'floating') return;
+
+    if (isOpen) {
+      widgetRef.current?.focus();
+    } else if (wasOpen.current) {
+      returnFocusRef?.current?.focus();
+    }
+    wasOpen.current = isOpen;
+  }, [isOpen, returnFocusRef, variant]);
+
+  useEffect(() => {
+    if (!isOpen || variant !== 'floating') return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !widgetRef.current) return;
+
+      const focusable = getFocusableElements(widgetRef.current);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        widgetRef.current.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const activeElement = document.activeElement;
+      if (event.shiftKey && (activeElement === first || activeElement === widgetRef.current)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (activeElement === last || !widgetRef.current.contains(activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, variant]);
 
   const handleNoticeOpen = (notice: Notice) => {
     setSelectedNotice(notice);
@@ -533,10 +587,16 @@ export function ChatbotWidget({
 
   return (
     <section
+      ref={widgetRef}
+      id={id}
       className={`chatplate-widget chatplate-widget--${variant}${isOpen ? ' is-open' : ''}`}
       style={{ '--chatplate-primary': botConfig.theme.primaryColor } as CSSProperties}
+      role={variant === 'floating' ? 'dialog' : 'region'}
+      aria-modal={variant === 'floating' ? true : undefined}
       aria-label={`${botConfig.bot.name} 챗봇 위젯`}
-      aria-hidden={!isOpen}
+      aria-hidden={variant === 'floating' ? !isOpen : undefined}
+      inert={variant === 'floating' && !isOpen ? true : undefined}
+      tabIndex={variant === 'floating' ? -1 : undefined}
     >
       <header className="widget-topbar">
         <button className="widget-topbar__brand" type="button" onClick={() => setActiveView('home')} aria-label="챗봇 홈으로 이동">
@@ -558,7 +618,7 @@ export function ChatbotWidget({
           <button className="icon-button" type="button" aria-label="챗봇 닫기" onClick={onClose}>
             <X size={19} aria-hidden="true" />
           </button>
-        ) : <span />}
+        ) : null}
       </header>
 
       <div className="widget-body">
