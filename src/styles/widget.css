@@ -64,6 +64,8 @@
   border-radius: 28px;
   background: var(--color-surface);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.16), 0 2px 12px rgba(0, 0, 0, 0.06);
+  font-size: 14px;
+  line-height: 1.5;
   opacity: 0;
   pointer-events: none;
   transform: translateY(12px);
@@ -239,9 +241,9 @@
   margin: 0;
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 1.22;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.4;
   letter-spacing: 0;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -305,7 +307,7 @@
   margin: 3px 0 0;
   overflow-wrap: anywhere;
   color: var(--color-text-primary);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.35;
 }
@@ -603,8 +605,8 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   color: inherit;
-  font-size: 15px;
-  line-height: 1.62;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .chat-bubble time {
@@ -764,7 +766,7 @@
 
 .contact-request-form__head strong {
   color: var(--color-text-primary);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.35;
 }
 
@@ -893,7 +895,7 @@
   color: #202123;
   background: transparent;
   font: inherit;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
@@ -1019,8 +1021,8 @@
 }
 
 .notice-detail h2 {
-  font-size: 20px;
-  line-height: 1.35;
+  font-size: 16px;
+  line-height: 1.45;
 }
 
 @media (max-width: 640px) {
@@ -1058,6 +1060,6 @@
   }
 
   .home-hero h2 {
-    font-size: 22px;
+    font-size: 18px;
   }
 }
