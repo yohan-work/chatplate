@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bell,
   Bot,
@@ -28,7 +28,9 @@ import type {
   AdminProfile,
   BotConfig,
   BotConfigMap,
+  ConversationSlaFilter,
   KnowledgeItem,
+  NotificationOutboxItem,
   Notice,
   QuickReply,
   SmallTalkRule,
@@ -52,6 +54,13 @@ import { clearTickets, loadTickets, ticketsToCsv } from '../../utils/ticketStora
 import { createClientMessageId, type ChatRepository } from '../../services/chatRepository';
 import { getChatRepository } from '../../services/getChatRepository';
 import { LocalChatRepository } from '../../services/localChatRepository';
+import {
+  formatSupportHours,
+  getConversationSlaState,
+  SUPPORT_WEEKDAYS,
+  validateSupportSchedule,
+  type SupportSchedule,
+} from '../../services/supportOperations';
 import { ChatbotLauncher } from '../widget/ChatbotLauncher';
 import { ChatbotWidget } from '../widget/ChatbotWidget';
 
@@ -288,31 +297,199 @@ function OperationSettingsForm({
   config: BotConfig;
   onUpdate: (updater: (config: BotConfig) => BotConfig) => void;
 }) {
+  const [holiday, setHoliday] = useState('');
+  const schedule = config.operation.supportSchedule;
+  const scheduleErrors = schedule ? validateSupportSchedule(schedule) : [];
+
   const updateOperation = (field: 'botHours' | 'csHours', value: string) => {
     onUpdate((current) => ({ ...current, operation: { ...current.operation, [field]: value } }));
   };
 
+  const updateSchedule = (updater: (current: SupportSchedule) => SupportSchedule) => {
+    onUpdate((current) => {
+      if (!current.operation.supportSchedule) return current;
+      const nextSchedule = updater(current.operation.supportSchedule);
+      const valid = validateSupportSchedule(nextSchedule).length === 0;
+      return {
+        ...current,
+        operation: {
+          ...current.operation,
+          supportSchedule: nextSchedule,
+          csHours: valid ? formatSupportHours(nextSchedule) : current.operation.csHours,
+        },
+      };
+    });
+  };
+
   return (
     <section className="admin-panel">
-      <PanelHeader title="운영시간" description="자동 응답 시간과 상담 가능 시간을 사용자 위젯에 표시합니다." />
+      <PanelHeader title="운영시간" description="고객 안내 문구와 최초 답변 SLA 계산에 사용하는 운영 일정을 관리합니다." />
       <TextField label="봇 응답 시간" value={config.operation.botHours} onChange={(value) => updateOperation('botHours', value)} />
-      <TextField label="상담 운영시간" value={config.operation.csHours} onChange={(value) => updateOperation('csHours', value)} />
-      <TextField
-        label="최초 답변 목표(운영시간 기준 분)"
-        value={String(config.operation.supportSchedule?.firstResponseTargetMinutes ?? 240)}
-        onChange={(value) => onUpdate((current) => ({
-          ...current,
-          operation: {
-            ...current.operation,
-            supportSchedule: {
-              timezone: current.operation.supportSchedule?.timezone ?? 'Asia/Seoul',
-              weekly: current.operation.supportSchedule?.weekly ?? {},
-              holidays: current.operation.supportSchedule?.holidays ?? [],
-              firstResponseTargetMinutes: Math.max(1, Number(value) || 240),
-            },
-          },
-        }))}
-      />
+      <TextAreaField label="고객 노출 상담시간" value={config.operation.csHours} onChange={(value) => updateOperation('csHours', value)} rows={2} readOnly={Boolean(schedule)} />
+
+      {!schedule ? (
+        <div className="operation-empty">
+          <p>구조화 일정이 없어 상담 요청 시 현재 시각부터 4시간을 목표로 계산합니다.</p>
+          <button
+            className="admin-add-button"
+            type="button"
+            onClick={() => onUpdate((current) => ({
+              ...current,
+              operation: {
+                ...current.operation,
+                supportSchedule: {
+                  timezone: 'Asia/Seoul',
+                  weekly: {},
+                  holidays: [],
+                  firstResponseTargetMinutes: 240,
+                },
+              },
+            }))}
+          >
+            <Plus size={15} aria-hidden="true" /> 구조화 일정 추가
+          </button>
+        </div>
+      ) : (
+        <div className="operation-schedule">
+          <div className="operation-schedule__summary">
+            <div>
+              <span>Timezone</span>
+              <strong>Asia/Seoul</strong>
+            </div>
+            <label>
+              <span>최초 답변 목표(운영시간 기준 분)</span>
+              <input
+                type="number"
+                min="1"
+                max="10080"
+                value={schedule.firstResponseTargetMinutes}
+                onChange={(event) => updateSchedule((current) => ({
+                  ...current,
+                  firstResponseTargetMinutes: Number(event.target.value),
+                }))}
+              />
+            </label>
+          </div>
+
+          <div className="operation-weekly" aria-label="요일별 상담 운영시간">
+            {SUPPORT_WEEKDAYS.map((weekday) => {
+              const ranges = schedule.weekly[weekday.id] ?? [];
+              return (
+                <div className="operation-weekday" key={weekday.id}>
+                  <strong>{weekday.label}</strong>
+                  <div>
+                    {ranges.map((range, index) => (
+                      <div className="operation-range" key={`${weekday.id}-${index}`}>
+                        <input
+                          type="time"
+                          aria-label={`${weekday.label}요일 시작 시간 ${index + 1}`}
+                          value={range.start}
+                          onChange={(event) => updateSchedule((current) => ({
+                            ...current,
+                            weekly: {
+                              ...current.weekly,
+                              [weekday.id]: (current.weekly[weekday.id] ?? []).map((entry, rangeIndex) =>
+                                rangeIndex === index ? { ...entry, start: event.target.value } : entry,
+                              ),
+                            },
+                          }))}
+                        />
+                        <span>~</span>
+                        <input
+                          type="time"
+                          aria-label={`${weekday.label}요일 종료 시간 ${index + 1}`}
+                          value={range.end}
+                          onChange={(event) => updateSchedule((current) => ({
+                            ...current,
+                            weekly: {
+                              ...current.weekly,
+                              [weekday.id]: (current.weekly[weekday.id] ?? []).map((entry, rangeIndex) =>
+                                rangeIndex === index ? { ...entry, end: event.target.value } : entry,
+                              ),
+                            },
+                          }))}
+                        />
+                        <button
+                          type="button"
+                          aria-label={`${weekday.label}요일 운영시간 삭제`}
+                          onClick={() => updateSchedule((current) => ({
+                            ...current,
+                            weekly: {
+                              ...current.weekly,
+                              [weekday.id]: (current.weekly[weekday.id] ?? []).filter((_, rangeIndex) => rangeIndex !== index),
+                            },
+                          }))}
+                        >
+                          <Trash2 size={14} aria-hidden="true" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      className="operation-range-add"
+                      type="button"
+                      onClick={() => updateSchedule((current) => ({
+                        ...current,
+                        weekly: {
+                          ...current.weekly,
+                          [weekday.id]: [...(current.weekly[weekday.id] ?? []), { start: '10:00', end: '18:00' }],
+                        },
+                      }))}
+                    >
+                      <Plus size={13} aria-hidden="true" /> 시간 추가
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="operation-holidays">
+            <strong>지정 휴무일</strong>
+            <div>
+              <input type="date" value={holiday} onChange={(event) => setHoliday(event.target.value)} />
+              <button
+                type="button"
+                disabled={!holiday || schedule.holidays.includes(holiday)}
+                onClick={() => {
+                  updateSchedule((current) => ({
+                    ...current,
+                    holidays: [...current.holidays, holiday].sort(),
+                  }));
+                  setHoliday('');
+                }}
+              >
+                휴무일 추가
+              </button>
+            </div>
+            <div className="operation-holiday-list">
+              {schedule.holidays.map((date) => (
+                <span key={date}>
+                  {date}
+                  <button
+                    type="button"
+                    aria-label={`${date} 휴무일 삭제`}
+                    onClick={() => updateSchedule((current) => ({
+                      ...current,
+                      holidays: current.holidays.filter((entry) => entry !== date),
+                    }))}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {schedule.holidays.length === 0 ? <small>등록된 휴무일이 없습니다.</small> : null}
+            </div>
+          </div>
+
+          {scheduleErrors.length ? (
+            <ul className="admin-callout admin-callout--error operation-errors" role="alert">
+              {scheduleErrors.map((error) => <li key={error}>{error}</li>)}
+            </ul>
+          ) : (
+            <p className="admin-callout">고객 노출 문구: {formatSupportHours(schedule)}</p>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -1021,51 +1198,80 @@ function TicketInboxPanel({
   const [bundle, setBundle] = useState<SupportConversationBundle>();
   const [notes, setNotes] = useState<SupportInternalNote[]>([]);
   const [auditEvents, setAuditEvents] = useState<SupportAuditEvent[]>([]);
+  const [outbox, setOutbox] = useState<NotificationOutboxItem[]>([]);
   const [savedReplies, setSavedReplies] = useState<SupportSavedReply[]>([]);
   const [members, setMembers] = useState<AdminProfile[]>([]);
   const [transferTo, setTransferTo] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | SupportConversation['status']>('all');
+  const [statusFilter, setStatusFilter] = useState<Exclude<SupportConversation['status'], 'bot_active'>>('waiting');
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'unassigned' | 'mine'>('all');
+  const [slaFilter, setSlaFilter] = useState<ConversationSlaFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
+  const [nextCursor, setNextCursor] = useState<string>();
   const [reply, setReply] = useState('');
   const [savedReplyTitle, setSavedReplyTitle] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState<string>();
   const [isWorking, setIsWorking] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [minuteNow, setMinuteNow] = useState(() => new Date());
+  const inboxRequestId = useRef(0);
+  const selectedRequestId = useRef(0);
 
-  const refreshInbox = useCallback(async () => {
+  const refreshInbox = useCallback(async (options?: { append?: boolean; cursor?: string }) => {
+    const requestId = ++inboxRequestId.current;
     const page = await repository.queryConversations({
       botId: config.bot.id,
+      status: statusFilter,
       assignment: assignmentFilter,
       adminId: admin.id,
       search: deferredSearchQuery,
-      limit: 100,
+      sla: statusFilter === 'resolved' ? 'all' : slaFilter,
+      cursor: options?.cursor,
+      limit: 30,
     });
-    const next = page.items
-      .filter((conversation) => conversation.status !== 'bot_active');
-    setConversations(next);
-    setSelectedConversationId((current) =>
-      next.some((conversation) => conversation.id === current) ? current : next[0]?.id ?? '',
-    );
-  }, [admin.id, assignmentFilter, config.bot.id, deferredSearchQuery, repository]);
+    if (requestId !== inboxRequestId.current) return;
+    setNextCursor(page.nextCursor);
+    setConversations((current) => {
+      if (!options?.append) return page.items;
+      const byId = new Map(current.map((conversation) => [conversation.id, conversation]));
+      for (const conversation of page.items) byId.set(conversation.id, conversation);
+      return [...byId.values()];
+    });
+    if (!options?.append) {
+      setSelectedConversationId((current) =>
+        page.items.some((conversation) => conversation.id === current) ? current : page.items[0]?.id ?? '',
+      );
+    }
+  }, [admin.id, assignmentFilter, config.bot.id, deferredSearchQuery, repository, slaFilter, statusFilter]);
 
   const refreshSelected = useCallback(async (conversationId: string) => {
-    const [nextBundle, nextNotes, nextAuditEvents, nextSavedReplies, nextMembers] = await Promise.all([
+    const requestId = ++selectedRequestId.current;
+    const [nextBundle, nextNotes, nextAuditEvents, nextOutbox] = await Promise.all([
       repository.loadConversation(conversationId),
       repository.listInternalNotes(conversationId),
       repository.listAuditEvents(conversationId),
-      repository.listSavedReplies(config.bot.id),
-      repository.listAdmins(),
+      repository.listNotificationOutbox(conversationId),
     ]);
+    if (requestId !== selectedRequestId.current) return;
     setBundle(nextBundle ?? undefined);
     setNotes(nextNotes);
     setAuditEvents(nextAuditEvents);
+    setOutbox(nextOutbox);
+  }, [repository]);
+
+  const refreshSharedData = useCallback(async () => {
+    const [nextSavedReplies, nextMembers] = await Promise.all([
+      repository.listSavedReplies(config.bot.id),
+      repository.listAdmins(),
+    ]);
     setSavedReplies(nextSavedReplies);
     setMembers(nextMembers.filter((member) => member.active));
   }, [config.bot.id, repository]);
 
   useEffect(() => {
+    setConversations([]);
+    setNextCursor(undefined);
     void refreshInbox().catch((nextError: unknown) => {
       setError(nextError instanceof Error ? nextError.message : '상담 목록을 불러오지 못했습니다.');
     });
@@ -1075,8 +1281,23 @@ function TicketInboxPanel({
   }, [config.bot.id, refreshInbox, repository]);
 
   useEffect(() => {
+    void refreshSharedData().catch((nextError: unknown) => {
+      setError(nextError instanceof Error ? nextError.message : '상담 운영 데이터를 불러오지 못했습니다.');
+    });
+  }, [refreshSharedData]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setMinuteNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     if (!selectedConversationId) {
+      selectedRequestId.current += 1;
       setBundle(undefined);
+      setNotes([]);
+      setAuditEvents([]);
+      setOutbox([]);
       return;
     }
     void Promise.all([
@@ -1090,14 +1311,7 @@ function TicketInboxPanel({
     });
   }, [refreshSelected, repository, selectedConversationId]);
 
-  const filteredConversations = statusFilter === 'all'
-    ? conversations
-    : conversations.filter((conversation) => conversation.status === statusFilter);
   const selectedConversation = bundle?.conversation;
-  const statusCounts = conversations.reduce<Record<SupportConversation['status'], number>>(
-    (counts, conversation) => ({ ...counts, [conversation.status]: counts[conversation.status] + 1 }),
-    { bot_active: 0, waiting: 0, human_active: 0, resolved: 0 },
-  );
   const statusLabel = (status: SupportConversation['status']) => {
     if (status === 'waiting') return '상담 대기';
     if (status === 'human_active') return '상담 중';
@@ -1148,14 +1362,20 @@ function TicketInboxPanel({
       {error ? <p className="admin-callout admin-callout--error" role="alert">{error}</p> : null}
 
       <div className="ticket-summary">
-        <button className={statusFilter === 'all' ? 'is-active' : ''} type="button" onClick={() => setStatusFilter('all')}>
-          전체 <strong>{conversations.length}</strong>
-        </button>
-        {(['waiting', 'human_active', 'resolved'] as SupportConversation['status'][]).map((status) => (
-          <button className={statusFilter === status ? 'is-active' : ''} key={status} type="button" onClick={() => setStatusFilter(status)}>
-            {statusLabel(status)} <strong>{statusCounts[status]}</strong>
+        {(['waiting', 'human_active', 'resolved'] as const).map((status) => (
+          <button
+            className={statusFilter === status ? 'is-active' : ''}
+            key={status}
+            type="button"
+            onClick={() => {
+              setStatusFilter(status);
+              if (status === 'resolved') setSlaFilter('all');
+            }}
+          >
+            {statusLabel(status)}
           </button>
         ))}
+        <span>현재 불러온 {conversations.length}건</span>
       </div>
 
       <div className="support-inbox-tools">
@@ -1177,26 +1397,55 @@ function TicketInboxPanel({
           <option value="unassigned">미배정</option>
           <option value="mine">내 상담</option>
         </select>
+        <select
+          value={statusFilter === 'resolved' ? 'all' : slaFilter}
+          aria-label="최초 응답 SLA 필터"
+          disabled={statusFilter === 'resolved'}
+          onChange={(event) => setSlaFilter(event.target.value as ConversationSlaFilter)}
+        >
+          <option value="all">전체 응답 목표</option>
+          <option value="dueSoon">1시간 이내</option>
+          <option value="overdue">응답 목표 초과</option>
+        </select>
       </div>
 
       <div className="admin-list-layout ticket-layout">
         <div className="admin-item-list">
-          {filteredConversations.map((conversation) => (
+          {conversations.map((conversation) => {
+            const sla = getConversationSlaState(conversation, minuteNow);
+            return (
+              <button
+                key={conversation.id}
+                className={selectedConversationId === conversation.id ? 'admin-list-item ticket-list-item is-active' : 'admin-list-item ticket-list-item'}
+                type="button"
+                onClick={() => setSelectedConversationId(conversation.id)}
+              >
+                <span className={`ticket-status ticket-status--${conversation.status}`}>{statusLabel(conversation.status)}</span>
+                <span className={`sla-badge sla-badge--${sla.kind}`}>{sla.label}</span>
+                <strong>{conversation.contact?.name ?? '익명 방문자'}</strong>
+                <span>
+                  {conversation.assignedName ?? '미배정'} · {new Date(conversation.lastMessageAt).toLocaleString('ko-KR')}
+                </span>
+                {conversation.unreadForAdmins > 0 ? <b className="admin-unread">{conversation.unreadForAdmins}</b> : null}
+              </button>
+            );
+          })}
+          {conversations.length === 0 ? <EmptyState text="조건에 맞는 상담 대화가 없습니다." /> : null}
+          {nextCursor ? (
             <button
-              key={conversation.id}
-              className={selectedConversationId === conversation.id ? 'admin-list-item ticket-list-item is-active' : 'admin-list-item ticket-list-item'}
+              className="support-load-more"
               type="button"
-              onClick={() => setSelectedConversationId(conversation.id)}
+              disabled={isLoadingMore}
+              onClick={() => {
+                setIsLoadingMore(true);
+                void refreshInbox({ append: true, cursor: nextCursor })
+                  .catch((nextError: unknown) => setError(nextError instanceof Error ? nextError.message : '다음 상담을 불러오지 못했습니다.'))
+                  .finally(() => setIsLoadingMore(false));
+              }}
             >
-              <span className={`ticket-status ticket-status--${conversation.status}`}>{statusLabel(conversation.status)}</span>
-              <strong>{conversation.contact?.name ?? '익명 방문자'}</strong>
-              <span>
-                {conversation.assignedName ?? '미배정'} · {new Date(conversation.lastMessageAt).toLocaleString('ko-KR')}
-              </span>
-              {conversation.unreadForAdmins > 0 ? <b className="admin-unread">{conversation.unreadForAdmins}</b> : null}
+              {isLoadingMore ? '불러오는 중…' : '더 불러오기'}
             </button>
-          ))}
-          {filteredConversations.length === 0 ? <EmptyState text="조건에 맞는 상담 대화가 없습니다." /> : null}
+          ) : null}
         </div>
 
         {selectedConversation && bundle ? (
@@ -1225,6 +1474,25 @@ function TicketInboxPanel({
               <div>
                 <span>생성</span>
                 <strong>{new Date(selectedConversation.createdAt).toLocaleString('ko-KR')}</strong>
+              </div>
+              <div>
+                <span>최초 응답 목표</span>
+                <strong>{selectedConversation.firstResponseDueAt
+                  ? new Date(selectedConversation.firstResponseDueAt).toLocaleString('ko-KR')
+                  : '-'}</strong>
+              </div>
+              <div>
+                <span>최초 답변</span>
+                <strong>{selectedConversation.firstRespondedAt
+                  ? new Date(selectedConversation.firstRespondedAt).toLocaleString('ko-KR')
+                  : '대기 중'}</strong>
+              </div>
+              <div>
+                <span>SLA</span>
+                {(() => {
+                  const sla = getConversationSlaState(selectedConversation, minuteNow);
+                  return <strong className={`sla-text sla-text--${sla.kind}`}>{sla.label}</strong>;
+                })()}
               </div>
             </div>
 
@@ -1341,7 +1609,10 @@ function TicketInboxPanel({
                     const title = savedReplyTitle.trim();
                     const body = reply.trim();
                     setSavedReplyTitle('');
-                    void runAction(() => repository.saveReply(config.bot.id, admin, title, body));
+                    void runAction(async () => {
+                      await repository.saveReply(config.bot.id, admin, title, body);
+                      await refreshSharedData();
+                    });
                   }}
                 >
                   저장 답변 추가
@@ -1379,6 +1650,21 @@ function TicketInboxPanel({
                 </p>
               ))}
               {auditEvents.length === 0 ? <small>기록된 상태 변경이 없습니다.</small> : null}
+            </section>
+
+            <section className="support-outbox">
+              <strong>고객 알림 상태</strong>
+              {outbox.map((entry) => (
+                <article key={entry.id}>
+                  <div>
+                    <span className={`outbox-status outbox-status--${entry.status}`}>{entry.status}</span>
+                    <b>{entry.channel.toUpperCase()}</b>
+                  </div>
+                  <time>{new Date(entry.availableAt).toLocaleString('ko-KR')}</time>
+                  <small>시도 {entry.attempts}회{entry.lastError ? ` · ${entry.lastError}` : ''}</small>
+                </article>
+              ))}
+              {outbox.length === 0 ? <small>예약되거나 처리된 고객 알림이 없습니다.</small> : null}
             </section>
 
             <button className="admin-add-button" type="button" onClick={createFaqDraft}>

@@ -431,6 +431,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
 }
 
 .ticket-summary button {
@@ -458,6 +459,13 @@
   font-size: 13px;
 }
 
+.ticket-summary > span {
+  margin-left: auto;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .ticket-layout {
   grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
 }
@@ -468,6 +476,49 @@
 
 .ticket-list-item .ticket-status {
   width: fit-content;
+}
+
+.sla-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: #52606d;
+  background: #eef1f4;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.sla-badge--dueSoon,
+.sla-text--dueSoon {
+  color: #8a5a00;
+  background: #fff4d6;
+}
+
+.sla-badge--overdue,
+.sla-badge--respondedLate,
+.sla-text--overdue,
+.sla-text--respondedLate {
+  color: #a12a25;
+  background: #fff0ef;
+}
+
+.sla-badge--respondedOnTime,
+.sla-text--respondedOnTime {
+  color: #146c43;
+  background: #e6f7ee;
+}
+
+.ticket-list-item .admin-unread {
+  top: auto;
+  bottom: 10px;
+}
+
+.sla-text {
+  width: fit-content;
+  padding: 3px 7px;
+  border-radius: 999px;
 }
 
 .ticket-status {
@@ -770,6 +821,15 @@
   padding: 0 10px;
 }
 
+.support-load-more {
+  min-height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  font-weight: 800;
+}
+
 .support-audit {
   display: grid;
   gap: 8px;
@@ -790,6 +850,199 @@
 
 .support-audit time {
   white-space: nowrap;
+}
+
+.support-outbox {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.support-outbox article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: white;
+}
+
+.support-outbox article div {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.support-outbox time,
+.support-outbox small {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+
+.support-outbox small {
+  grid-column: 1 / -1;
+}
+
+.outbox-status {
+  padding: 3px 6px;
+  border-radius: 999px;
+  color: #52606d;
+  background: #eef1f4;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.outbox-status--sent {
+  color: #146c43;
+  background: #e6f7ee;
+}
+
+.outbox-status--failed,
+.outbox-status--dead {
+  color: #a12a25;
+  background: #fff0ef;
+}
+
+.outbox-status--pending,
+.outbox-status--processing {
+  color: #8a5a00;
+  background: #fff4d6;
+}
+
+.operation-empty,
+.operation-schedule {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface-soft);
+}
+
+.operation-empty p,
+.operation-schedule p {
+  margin: 0;
+}
+
+.operation-schedule__summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 1fr);
+  gap: 10px;
+}
+
+.operation-schedule__summary > div,
+.operation-schedule__summary > label {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  background: white;
+}
+
+.operation-schedule__summary span {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.operation-schedule__summary input {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.operation-weekly {
+  display: grid;
+  gap: 8px;
+}
+
+.operation-weekday {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border-radius: 12px;
+  background: white;
+}
+
+.operation-weekday > strong {
+  padding-top: 9px;
+}
+
+.operation-weekday > div {
+  display: grid;
+  gap: 7px;
+}
+
+.operation-range {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.operation-range input,
+.operation-holidays input {
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: white;
+}
+
+.operation-range button,
+.operation-range-add,
+.operation-holidays button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: white;
+  font-weight: 800;
+}
+
+.operation-range-add {
+  width: fit-content;
+}
+
+.operation-holidays {
+  display: grid;
+  gap: 8px;
+}
+
+.operation-holidays > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.operation-holiday-list span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: white;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.operation-holiday-list span button {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+}
+
+.operation-errors {
+  padding-left: 32px;
 }
 
 .team-invite {
@@ -1290,8 +1543,17 @@
   .quality-result__top,
   .score-grid,
   .data-grid,
-  .smalltalk-grid {
+  .smalltalk-grid,
+  .operation-schedule__summary {
     grid-template-columns: 1fr;
+  }
+
+  .support-inbox-tools {
+    flex-wrap: wrap;
+  }
+
+  .support-inbox-tools label {
+    flex-basis: 100%;
   }
 }
 
