@@ -1,14 +1,17 @@
+import { attachRetryableLauncher, createRetryableLoader } from './services/retryableWidgetLoader';
+
 const script = document.currentScript as HTMLScriptElement | null;
 const botId = script?.dataset.botId ?? 'coach-myway';
 const autoInit = script?.dataset.autoInit !== 'false';
 
-let widgetModule: Promise<typeof import('./widget-entry')> | undefined;
 function importWidget() {
   return import('./widget-entry');
 }
 
+const retryableImportWidget = createRetryableLoader(importWidget);
+
 function loadWidget() {
-  widgetModule ??= importWidget();
+  const widgetModule = retryableImportWidget();
   (window as Window & { ChatplateReady?: Promise<unknown> }).ChatplateReady = widgetModule;
   return widgetModule;
 }
@@ -22,7 +25,7 @@ if (autoInit) {
   const button = document.createElement('button');
   button.type = 'button';
   button.setAttribute('aria-label', '상담 채팅 열기');
-  button.textContent = '상담';
+  button.setAttribute('aria-live', 'polite');
   button.style.cssText = [
     'position:fixed',
     'right:24px',
@@ -38,13 +41,13 @@ if (autoInit) {
     'font:700 13px system-ui,sans-serif',
     'cursor:pointer',
   ].join(';');
-  button.addEventListener('click', () => {
-    button.disabled = true;
-    void mount(true).then(() => button.remove()).catch(() => {
-      button.disabled = false;
-      button.textContent = '다시 시도';
-    });
-  }, { once: true });
+  attachRetryableLauncher({
+    button,
+    mount: () => mount(true),
+    idleLabel: '상담',
+    retryLabel: '다시 시도',
+    retryAriaLabel: '상담 채팅 다시 시도',
+  });
   document.body.appendChild(button);
 } else {
   void loadWidget();
