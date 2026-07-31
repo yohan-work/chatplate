@@ -173,8 +173,13 @@ export class LocalChatRepository implements ChatRepository {
         if (query.status && query.status !== 'all' && conversation.status !== query.status) return false;
         if (query.assignment === 'unassigned' && conversation.assignedTo) return false;
         if (query.assignment === 'mine' && conversation.assignedTo !== query.adminId) return false;
-        if (query.sla === 'overdue' && (!conversation.firstResponseDueAt || conversation.firstResponseDueAt >= now())) return false;
+        if (query.sla === 'overdue' && (
+          conversation.firstRespondedAt ||
+          !conversation.firstResponseDueAt ||
+          conversation.firstResponseDueAt >= now()
+        )) return false;
         if (query.sla === 'dueSoon') {
+          if (conversation.firstRespondedAt) return false;
           const dueAt = conversation.firstResponseDueAt ? new Date(conversation.firstResponseDueAt).getTime() : 0;
           const remaining = dueAt - Date.now();
           if (remaining <= 0 || remaining > 60 * 60 * 1000) return false;
@@ -187,7 +192,9 @@ export class LocalChatRepository implements ChatRepository {
           conversation.contact?.name.toLocaleLowerCase('ko-KR').includes(search) ||
           conversation.contact?.contact.toLocaleLowerCase('ko-KR').includes(search);
       })
-      .sort((left, right) => right.lastMessageAt.localeCompare(left.lastMessageAt));
+      .sort((left, right) =>
+        right.lastMessageAt.localeCompare(left.lastMessageAt) || right.id.localeCompare(left.id),
+      );
     const cursorIndex = query.cursor ? sorted.findIndex((entry) => entry.id === query.cursor) + 1 : 0;
     const start = Math.max(0, cursorIndex);
     const limit = Math.min(100, Math.max(1, query.limit ?? 30));

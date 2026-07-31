@@ -160,4 +160,63 @@ describe('LocalChatRepository', () => {
     expect(await repository.anonymizeExpiredContacts(180, new Date('2027-07-30T00:00:00.000Z'))).toBe(1);
     expect((await repository.loadConversation(created.conversation.id))?.conversation.contact?.contact).toBe('삭제됨');
   });
+
+  it('excludes answered conversations from active SLA filters', async () => {
+    const repository = new LocalChatRepository(createStorage(), 'admin');
+    const created = await repository.createVisitorConversation('coach-myway');
+    await repository.requestHandoff(
+      created.conversation.id,
+      { name: '고객', contact: '010-0000-0000', privacyAgreedAt: new Date().toISOString() },
+      'manualContact',
+      new Date(Date.now() - 60_000).toISOString(),
+    );
+    expect((await repository.queryConversations({
+      botId: 'coach-myway',
+      status: 'waiting',
+      sla: 'overdue',
+    })).items).toHaveLength(1);
+
+    await repository.claimConversation(created.conversation.id, admin);
+    await repository.appendMessage({
+      conversationId: created.conversation.id,
+      clientId: 'first-response',
+      sender: 'operator',
+      senderId: admin.id,
+      senderName: admin.displayName,
+      text: '첫 답변입니다.',
+    });
+    expect((await repository.queryConversations({
+      botId: 'coach-myway',
+      status: 'human_active',
+      sla: 'overdue',
+    })).items).toHaveLength(0);
+  });
+
+  it('paginates support conversations without duplicate cursor items', async () => {
+    const repository = new LocalChatRepository(createStorage(), 'admin');
+    for (let index = 0; index < 35; index += 1) {
+      const created = await repository.createVisitorConversation('coach-myway');
+      await repository.requestHandoff(
+        created.conversation.id,
+        { name: `고객 ${index}`, contact: String(index), privacyAgreedAt: new Date().toISOString() },
+        'fallback',
+      );
+    }
+
+    const first = await repository.queryConversations({
+      botId: 'coach-myway',
+      status: 'waiting',
+      limit: 30,
+    });
+    const second = await repository.queryConversations({
+      botId: 'coach-myway',
+      status: 'waiting',
+      cursor: first.nextCursor,
+      limit: 30,
+    });
+    expect(first.items).toHaveLength(30);
+    expect(first.nextCursor).toBeTruthy();
+    expect(second.items).toHaveLength(5);
+    expect(new Set([...first.items, ...second.items].map((entry) => entry.id)).size).toBe(35);
+  });
 });
