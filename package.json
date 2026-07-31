@@ -9,6 +9,7 @@
     "check:widget-budget": "node scripts/check-widget-budget.mjs",
     "lint": "eslint .",
     "preview": "vite preview --host 0.0.0.0",
+    "qa:conversation": "vite-node src/qa/runConversationQa.ts",
     "test": "vitest run"
   },
   "dependencies": {
