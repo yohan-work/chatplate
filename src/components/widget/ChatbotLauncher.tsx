@@ -13,7 +13,7 @@ export function ChatbotLauncher({ buttonRef, controlsId, isOpen, unreadCount, on
   return (
     <button
       ref={buttonRef}
-      className="chatplate-launcher"
+      className={`chatplate-launcher${isOpen ? ' is-open' : ''}`}
       type="button"
       aria-controls={controlsId}
       aria-expanded={controlsId ? isOpen : undefined}

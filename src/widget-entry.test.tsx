@@ -30,6 +30,7 @@ describe('public widget lifecycle', () => {
 
     await user.click(launcher);
     await waitFor(() => expect(launcher.getAttribute('aria-expanded')).toBe('true'));
+    expect(launcher.classList.contains('is-open')).toBe(true);
     expect(dialog?.hasAttribute('inert')).toBe(false);
     expect(dialog?.getAttribute('role')).toBe('dialog');
     expect(dialog?.getAttribute('aria-modal')).toBe('true');
@@ -83,12 +84,24 @@ describe('public widget lifecycle', () => {
     expect(mounted.container.isConnected).toBe(false);
   });
 
-  it('keeps the page variant as a non-modal region', async () => {
+  it('keeps the customer page widget closed until its floating launcher is activated', async () => {
+    const user = userEvent.setup();
     render(<CustomerApp />);
-    const region = await screen.findByRole('region', { name: /챗봇 위젯/ });
+    const launcher = await screen.findByRole('button', { name: '챗봇 열기' });
+    const widgetId = launcher.getAttribute('aria-controls');
+    const dialog = document.getElementById(widgetId ?? '');
 
-    expect(region.hasAttribute('inert')).toBe(false);
-    expect(region.hasAttribute('aria-modal')).toBe(false);
-    expect(region.hasAttribute('tabindex')).toBe(false);
+    expect(launcher.getAttribute('aria-expanded')).toBe('false');
+    expect(dialog?.getAttribute('role')).toBe('dialog');
+    expect(dialog?.hasAttribute('inert')).toBe(true);
+
+    await user.click(launcher);
+    await waitFor(() => expect(launcher.getAttribute('aria-expanded')).toBe('true'));
+    expect(dialog?.hasAttribute('inert')).toBe(false);
+    expect(document.activeElement).toBe(dialog);
+
+    await user.click(within(dialog as HTMLElement).getByRole('button', { name: '챗봇 닫기' }));
+    await waitFor(() => expect(launcher.getAttribute('aria-expanded')).toBe('false'));
+    expect(document.activeElement).toBe(launcher);
   });
 });

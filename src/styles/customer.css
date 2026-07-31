@@ -6,8 +6,7 @@
 }
 
 .customer-page__header,
-.customer-page__intro,
-.customer-page .chatplate-widget--page {
+.customer-page__intro {
   width: min(760px, 100%);
   margin-inline: auto;
 }

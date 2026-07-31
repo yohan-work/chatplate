@@ -16,20 +16,36 @@
   cursor: pointer;
 }
 
+.chatplate-floating-root {
+  --chatplate-primary: var(--color-primary);
+}
+
 .chatplate-launcher {
   position: fixed;
   right: 24px;
   bottom: 24px;
   z-index: 30;
-  width: 58px;
-  height: 58px;
+  width: 60px;
+  height: 60px;
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: var(--radius-launcher);
+  border-radius: 20px;
   color: #fff;
-  background: #171717;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+  background: var(--chatplate-primary, var(--color-primary));
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--chatplate-primary, var(--color-primary)) 32%, transparent), 0 3px 10px rgba(0, 0, 0, 0.14);
+  transition: color 160ms ease, background 160ms ease, border-radius 160ms ease, transform 160ms ease;
+}
+
+.chatplate-launcher:hover {
+  transform: translateY(-2px);
+}
+
+.chatplate-launcher.is-open {
+  border-radius: 50%;
+  color: #667085;
+  background: #fff;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.08);
 }
 
 .launcher-badge {
@@ -707,6 +723,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .chatplate-widget,
+  .chatplate-launcher {
+    transition: none;
+  }
+
+  .chatplate-launcher:hover {
+    transform: none;
+  }
+
   .thinking-indicator__dots i {
     animation: none;
     opacity: 0.65;
@@ -1030,18 +1055,18 @@
   }
 
   .chatplate-launcher {
-    right: 18px;
-    bottom: 18px;
-    width: 56px;
-    height: 56px;
+    right: 16px;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    width: 60px;
+    height: 60px;
   }
 
-  .chatplate-widget {
-    inset: 0;
-    width: 100vw;
-    height: 100dvh;
-    border: 0;
-    border-radius: 0;
+  .chatplate-widget:not(.chatplate-widget--page) {
+    inset: max(16px, env(safe-area-inset-top)) 16px calc(92px + env(safe-area-inset-bottom)) 16px;
+    width: auto;
+    height: auto;
+    border: 1px solid var(--color-border);
+    border-radius: 28px;
   }
 
   .widget-topbar {

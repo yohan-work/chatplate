@@ -1,7 +1,6 @@
-import { StrictMode, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { StrictMode, useEffect, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { ChatbotLauncher } from './components/widget/ChatbotLauncher';
-import { ChatbotWidget } from './components/widget/ChatbotWidget';
+import { FloatingChatbotShell } from './components/widget/FloatingChatbotShell';
 import type { BotConfig } from './types/chatbot';
 import { validateBotConfig } from './utils/dataPortability';
 import { loadPublishedBotConfig } from './services/loadPublishedBotConfig';
@@ -86,11 +85,6 @@ function PublicWidget({
   onEvent?: ChatplateInitOptions['onEvent'];
 }) {
   const [botConfig, setBotConfig] = useState(initialConfig);
-  const [isOpen, setIsOpen] = useState(initiallyOpen);
-  const [supportUnreadCount, setSupportUnreadCount] = useState(0);
-  const widgetId = useId();
-  const launcherRef = useRef<HTMLButtonElement>(null);
-  const unreadCount = botConfig.notices.filter((notice) => notice.unread).length + supportUnreadCount;
 
   useEffect(() => {
     let active = true;
@@ -108,30 +102,12 @@ function PublicWidget({
     };
   }, [botId, onEvent]);
 
-  const transitionOpen = useCallback((next: boolean) => {
-    if (next === isOpen) return;
-    setIsOpen(next);
-    onEvent?.({ type: next ? 'open' : 'close', botId });
-  }, [botId, isOpen, onEvent]);
-
   return (
-    <>
-      <ChatbotLauncher
-        buttonRef={launcherRef}
-        controlsId={widgetId}
-        isOpen={isOpen}
-        unreadCount={unreadCount}
-        onToggle={() => transitionOpen(!isOpen)}
-      />
-      <ChatbotWidget
-        id={widgetId}
-        botConfig={botConfig}
-        isOpen={isOpen}
-        onClose={() => transitionOpen(false)}
-        onUnreadChange={setSupportUnreadCount}
-        returnFocusRef={launcherRef}
-      />
-    </>
+    <FloatingChatbotShell
+      botConfig={botConfig}
+      initiallyOpen={initiallyOpen}
+      onOpenChange={(isOpen) => onEvent?.({ type: isOpen ? 'open' : 'close', botId })}
+    />
   );
 }
 

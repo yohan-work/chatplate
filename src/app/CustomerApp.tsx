@@ -1,5 +1,5 @@
 import { MessageCircle } from 'lucide-react';
-import { ChatbotWidget } from '../components/widget/ChatbotWidget';
+import { FloatingChatbotShell } from '../components/widget/FloatingChatbotShell';
 import { botConfigs } from '../data/bots';
 
 const botConfig = botConfigs['coach-myway'];
@@ -18,7 +18,7 @@ export function CustomerApp() {
         <h1>지금 필요한 학습 고민부터<br />차분히 정리해 보세요.</h1>
         <span>등록된 안내를 바탕으로 답변하며, 개인별 판단이 필요한 내용은 상담 채널로 연결합니다.</span>
       </section>
-      <ChatbotWidget botConfig={botConfig} isOpen onClose={() => undefined} variant="page" />
+      <FloatingChatbotShell botConfig={botConfig} />
     </main>
   );
 }
