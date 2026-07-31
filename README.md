@@ -72,6 +72,15 @@ npm run build
 
 `window.Chatplate.init({ config })`로 외부에서 직접 bot config 객체를 전달할 수도 있습니다.
 
+직접 초기화한 위젯은 반환된 controller로 정리할 수 있습니다. 같은 target에 다시 초기화하면 기존 위젯은 먼저 정리됩니다.
+
+```js
+const widget = window.Chatplate.init({ botId: "coach-myway", target: "#support-widget" });
+
+// SPA 화면 전환이나 host component unmount 시
+widget.destroy();
+```
+
 ## 데이터 이동
 
 관리자 콘솔의 `데이터` 탭에서 다음 작업을 할 수 있습니다.
