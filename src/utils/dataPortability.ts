@@ -1,5 +1,6 @@
 import { validateSmallTalkConfig } from '../engine/resolveConversation';
 import type { BotConfig, BotConfigMap, ConversationEvent, SmallTalkConfig, SmallTalkIntentId } from '../types/chatbot';
+import { redactConversationText } from './redactConversationData';
 
 export interface ValidationResult {
   ok: boolean;
@@ -132,13 +133,27 @@ function escapeCsvCell(value: unknown): string {
   return rawValue;
 }
 
+function pseudonymousId(value: string | undefined): string {
+  if (!value) return '';
+  let hash = 2166136261;
+  for (const char of value) {
+    hash ^= char.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  return `conversation-${(hash >>> 0).toString(16).padStart(8, '0')}`;
+}
+
 export function conversationEventsToCsv(events: ConversationEvent[]): string {
   const headers = [
     'id',
     'botId',
+    'conversationId',
+    'turnIndex',
     'query',
     'status',
     'confidence',
+    'answerTrust',
+    'guardCategory',
     'interactionType',
     'effectiveQuery',
     'smallTalkIntent',
@@ -156,16 +171,33 @@ export function conversationEventsToCsv(events: ConversationEvent[]): string {
     'contextualScore',
     'selectedCandidateId',
     'feedback',
+    'feedbackReason',
+    'replyPolicy',
+    'replyText',
+    'dialogueActs',
+    'resolvedIntentIds',
+    'pendingCandidateIds',
+    'contextRevision',
+    'engineVersion',
     'createdAt',
   ];
-  const rows = events.map((event) => [
+  const rows = events.map((event) => {
+    const query = redactConversationText(event.query).text;
+    const effectiveQuery = redactConversationText(event.effectiveQuery ?? '').text;
+    const replyText = redactConversationText(event.replyText ?? '').text;
+    const feedbackReason = redactConversationText(event.feedbackReason ?? '').text;
+    return [
     event.id,
     event.botId,
-    event.query,
+    pseudonymousId(event.conversationId),
+    event.turnIndex ?? '',
+    query,
     event.status,
     event.confidence,
+    event.answerTrust ?? '',
+    event.guardCategory ?? '',
     event.interactionType ?? '',
-    event.effectiveQuery ?? '',
+    effectiveQuery,
     event.smallTalkIntent ?? '',
     event.matchedKnowledgeIds.join('|'),
     event.candidateKnowledgeIds?.join('|') ?? '',
@@ -181,8 +213,17 @@ export function conversationEventsToCsv(events: ConversationEvent[]): string {
     event.contextualScore ?? '',
     event.selectedCandidateId ?? '',
     event.feedback ?? '',
+    feedbackReason,
+    event.replyPolicy ?? '',
+    replyText,
+    event.dialogueActs?.join('|') ?? '',
+    event.resolvedIntentIds?.join('|') ?? '',
+    event.pendingCandidateIds?.join('|') ?? '',
+    event.contextRevision ?? '',
+    event.engineVersion ?? '',
     event.createdAt,
-  ]);
+    ];
+  });
 
   return [headers, ...rows].map((row) => row.map(escapeCsvCell).join(',')).join('\n');
 }

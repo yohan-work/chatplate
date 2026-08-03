@@ -8,8 +8,8 @@ export interface AnalyticsRepository {
 }
 
 class LocalAnalyticsRepository implements AnalyticsRepository {
-  async record(_conversationId: string, event: ConversationEvent): Promise<void> {
-    appendConversationEvent(event);
+  async record(conversationId: string, event: ConversationEvent): Promise<void> {
+    appendConversationEvent({ ...event, conversationId });
   }
 
   async list(botId: string, limit = 500): Promise<ConversationEvent[]> {

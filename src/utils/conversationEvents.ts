@@ -20,6 +20,7 @@ export function createConversationEvent(
   effectiveQuery = query,
   routeDecision?: ConversationRouteDecision,
   resolution?: Pick<ConversationResolution, 'answerTrust' | 'guardDecision'>,
+  metadata?: Pick<ConversationEvent, 'conversationId' | 'turnIndex' | 'replyPolicy' | 'replyText' | 'dialogueActs' | 'resolvedIntentIds' | 'pendingCandidateIds' | 'contextRevision' | 'engineVersion'>,
 ): ConversationEvent {
   const matchedItems = result.items ?? (result.item ? [result.item] : []);
   const candidateItems = [...matchedItems, ...result.suggestions, ...result.alternatives];
@@ -46,11 +47,16 @@ export function createConversationEvent(
     contextualKnowledgeId: routeDecision?.contextualKnowledgeId,
     standaloneScore: routeDecision?.standaloneScore,
     contextualScore: routeDecision?.contextualScore,
+    ...metadata,
     createdAt: new Date().toISOString(),
   };
 }
 
-export function createSmallTalkConversationEvent(botId: string, resolution: ConversationResolution): ConversationEvent {
+export function createSmallTalkConversationEvent(
+  botId: string,
+  resolution: ConversationResolution,
+  metadata?: Pick<ConversationEvent, 'conversationId' | 'turnIndex' | 'replyText' | 'dialogueActs' | 'contextRevision' | 'engineVersion'>,
+): ConversationEvent {
   return {
     id: `event-${Date.now()}-${Math.random().toString(16).slice(2)}`,
     botId,
@@ -64,6 +70,8 @@ export function createSmallTalkConversationEvent(botId: string, resolution: Conv
     matchedKnowledgeIds: [],
     candidateKnowledgeIds: [],
     decisionReason: undefined,
+    replyPolicy: 'smalltalk',
+    ...metadata,
     createdAt: new Date().toISOString(),
   };
 }

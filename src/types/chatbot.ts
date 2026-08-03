@@ -488,6 +488,16 @@ export interface ConversationEvent {
   contextualScore?: number;
   selectedCandidateId?: string;
   feedback?: 'helpful' | 'not-helpful';
+  feedbackReason?: string;
+  conversationId?: string;
+  turnIndex?: number;
+  replyPolicy?: 'answer' | 'clarify' | 'fallback' | 'smalltalk';
+  replyText?: string;
+  dialogueActs?: DialogueAct[];
+  resolvedIntentIds?: string[];
+  pendingCandidateIds?: string[];
+  contextRevision?: number;
+  engineVersion?: string;
   createdAt: string;
 }
 

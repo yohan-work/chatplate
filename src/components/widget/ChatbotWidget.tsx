@@ -432,7 +432,14 @@ export function ChatbotWidget({
       let botMessage: ChatMessage;
 
       if (resolution.kind === 'smalltalk') {
-        const event = createSmallTalkConversationEvent(botConfig.bot.id, resolution);
+        const event = createSmallTalkConversationEvent(botConfig.bot.id, resolution, {
+          conversationId: supportConversation.id,
+          turnIndex: resolution.contextPatch?.turnCount,
+          replyText: resolution.replyText,
+          dialogueActs: resolution.dialogueActs,
+          contextRevision: resolution.contextPatch?.stateRevision,
+          engineVersion: 'phase6-rule-engine-v1',
+        });
         if (repository.kind === 'local') appendConversationEvent(event);
         else void analyticsRepository.record(supportConversation.id, event).catch(() => undefined);
         botMessage = createMessage('bot', resolution.replyText ?? botConfig.bot.fallbackMessage, {
@@ -451,6 +458,19 @@ export function ChatbotWidget({
           resolution.effectiveQuery,
           resolution.routeDecision,
           resolution,
+          {
+            conversationId: supportConversation.id,
+            turnIndex: resolution.contextPatch?.turnCount,
+            replyPolicy: resolution.routeDecision?.mode === 'clarification'
+              ? 'clarify'
+              : result.status === 'fallback' ? 'fallback' : 'answer',
+            replyText: resolution.replyText ?? resolution.responsePlan?.text,
+            dialogueActs: resolution.dialogueActs,
+            resolvedIntentIds: resolution.resolvedIntents?.flatMap((intent) => intent.knowledgeIds),
+            pendingCandidateIds: resolution.contextPatch?.pendingCandidateIds,
+            contextRevision: resolution.contextPatch?.stateRevision,
+            engineVersion: 'phase6-rule-engine-v1',
+          },
         );
         if (repository.kind === 'local') appendConversationEvent(event);
         else void analyticsRepository.record(supportConversation.id, event).catch(() => undefined);
