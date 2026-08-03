@@ -53,14 +53,14 @@ describe('searchKnowledge', () => {
     expect(result.status).toBe('fallback');
   });
 
-  it('activates the Coach My:Way 50-question and 2,000-utterance split catalog', () => {
+  it('activates the Coach My:Way 70-question and 2,800-utterance split catalog', () => {
     const knowledge = botConfigs['coach-myway'].knowledge;
-    expect(knowledge).toHaveLength(50);
+    expect(knowledge).toHaveLength(70);
     expect(knowledge.every((item) => item.status === 'active')).toBe(true);
-    expect(knowledge.flatMap((item) => item.utterances ?? [])).toHaveLength(2000);
-    expect(knowledge.flatMap((item) => item.utterances ?? []).filter((utterance) => utterance.split === 'train')).toHaveLength(1400);
-    expect(knowledge.flatMap((item) => item.utterances ?? []).filter((utterance) => utterance.split === 'dev')).toHaveLength(300);
-    expect(knowledge.flatMap((item) => item.utterances ?? []).filter((utterance) => utterance.split === 'test')).toHaveLength(300);
+    expect(knowledge.flatMap((item) => item.utterances ?? [])).toHaveLength(2800);
+    expect(knowledge.flatMap((item) => item.utterances ?? []).filter((utterance) => utterance.split === 'train')).toHaveLength(1960);
+    expect(knowledge.flatMap((item) => item.utterances ?? []).filter((utterance) => utterance.split === 'dev')).toHaveLength(420);
+    expect(knowledge.flatMap((item) => item.utterances ?? []).filter((utterance) => utterance.split === 'test')).toHaveLength(420);
     expect(knowledge.every((item) => item.answer.trim().length > 0)).toBe(true);
     expect(knowledge.every((item) => item.answerMode && item.riskLevel)).toBe(true);
     const utterances = knowledge.flatMap((item) => item.utterances?.map((utterance) => normalizeText(utterance.text)) ?? []);

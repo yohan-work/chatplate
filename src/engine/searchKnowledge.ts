@@ -17,9 +17,12 @@ export function searchKnowledge(
   const index = buildSearchIndex(botConfig);
   const ranked = rankKnowledge(analysis, index, options?.intentId);
   const result = decideSearchResult(ranked);
-  const curatedKnowledgeId = options?.variant === 'baseline' || result.decisionReason === 'exact'
+  const matchedCuratedKnowledgeId = options?.variant === 'baseline'
     ? undefined
     : matchCuratedKnowledgeId(query, botConfig.bot.id);
+  const curatedKnowledgeId = result.decisionReason === 'exact'
+    ? undefined
+    : matchedCuratedKnowledgeId;
   const curatedItem = curatedKnowledgeId ? findKnowledgeById(botConfig, curatedKnowledgeId) : undefined;
   if (curatedItem && (curatedItem.status ?? 'active') === 'active') {
     const relatedItems = curatedItem.relatedIds

@@ -6,6 +6,18 @@ interface CuratedIntentRule {
 }
 
 const COACH_MYWAY_RULES: CuratedIntentRule[] = [
+  { knowledgeId: 'advice-follow-plan', pattern: /(?:계획|계획표|작심삼일).*(?:안\s*지켜|못\s*지켜|실천|답답|어떻게|고치)/u },
+  { knowledgeId: 'advice-parent-conflict', pattern: /(?:공부|학습).*(?:(?:부모|엄마|아빠|아이|자녀).*)?(?:싸우|싸워|갈등|잔소리)|(?:잔소리|갈등).*(?:공부|학습)/u },
+  { knowledgeId: 'advice-start', pattern: /(?:책상|공부).*(?:시작).*(?:못|싫|어렵|방법|어떻게)/u },
+  { knowledgeId: 'advice-focus', pattern: /(?:집중|산만|딴짓).*(?:안\s*돼|못|방법|어떻게|높이)/u },
+  { knowledgeId: 'advice-phone', pattern: /(?:스마트폰|핸드폰|휴대폰).*(?:공부|집중|줄이|자꾸|계속|방해|보게|봐)/u },
+  { knowledgeId: 'advice-test-anxiety', pattern: /(?:시험).*(?:불안|긴장|떨|스트레스)/u },
+  { knowledgeId: 'advice-exam-plan', pattern: /(?:시험|내신).*(?:얼마\s*안|코앞|계획|준비|급)/u },
+  { knowledgeId: 'advice-motivation', pattern: /(?:공부|학습).*(?:동기|의욕|마음이\s*없)|(?:동기부여).*(?:방법|필요)/u },
+  { knowledgeId: 'advice-slump', pattern: /(?:슬럼프|무기력|손에\s*안\s*잡|페이스).*(?:공부|학습|어떻게|회복)?/u },
+  { knowledgeId: 'advice-time', pattern: /(?:시간\s*관리|공부할\s*시간|시간표).*(?:어떻게|못|부족|짜)/u },
+  { knowledgeId: 'advice-weak-subject', pattern: /(?:수학|영어|국어|과학|특정\s*과목).*(?:너무\s*어렵|약해|못해|공부법|어떻게)/u },
+  { knowledgeId: 'advice-multiple-subjects', pattern: /(?:여러\s*과목|전과목|모든\s*과목).*(?:관리|계획|함께|어떻게)/u },
   { knowledgeId: 'intro-005', pattern: /(?:고르|선택|문의\s*전|첫\s*문의\s*전|알아보기\s*전).*(?:기준|체크|확인|알아둘|내용)/u },
   { knowledgeId: 'privacy-002', pattern: /(?:성적표|모의고사).*(?:사진|이미지|결과|점수|보내|공유|올려|필요)/u },
   { knowledgeId: 'privacy-003', pattern: /(?:실명|학생\s*이름|연락처|전화번호).*(?:필요|꼭|제공|남겨)/u },
@@ -15,12 +27,15 @@ const COACH_MYWAY_RULES: CuratedIntentRule[] = [
 
   { knowledgeId: 'consultation-008', pattern: /(?:상담|예약).*(?:날짜|일정).*(?:바꾸|변경|취소|옮기)|(?:예약|상담).*(?:취소|변경)/u },
   { knowledgeId: 'consultation-007', pattern: /(?:상담).*(?:방문|현장|화상|온라인|비대면).*(?:선택|가능|꼭|가야|방식)/u },
+  { knowledgeId: 'consultation-007', pattern: /(?:방문|현장|화상|온라인|비대면).*(?:상담).*(?:선택|가능|방식|다시)/u },
   { knowledgeId: 'consultation-006', pattern: /(?:부모|보호자|학생).*(?:같이|함께|동반|혼자).*(?:참석|가야|가|상담)/u },
   { knowledgeId: 'consultation-005', pattern: /(?:부모|보호자|엄마|아빠).*(?:혼자|만|먼저).*(?:상담|이야기|만나)/u },
   { knowledgeId: 'consultation-004', pattern: /(?:상담|접수|신청).*(?:후|뒤|다음|남긴).*(?:절차|순서|단계|진행|연락)/u },
   { knowledgeId: 'consultation-003', pattern: /(?:(?:첫|초기|문의|상담).*(?:전에|전|준비).*(?:내용|무엇|학년|고민|준비)|첫\s*상담.*(?:준비|무엇))/u },
   { knowledgeId: 'consultation-002', pattern: /(?:우리|자녀|아이|학생).*(?:맞|적합|도움).*(?:상담|판단|확인|프로그램|보고|알고|궁금)/u },
   { knowledgeId: 'consultation-001', pattern: /(?:처음|코칭|상담).*(?:문의|접수|신청).*(?:방법|채널|어디|순서)|상담.*어디.*신청|(?:카카오|카톡).*(?:상담|문의)/u },
+  { knowledgeId: 'consultation-001', pattern: /(?:상담).*(?:신청\s*방법|어디서\s*신청|신청\s*채널|문의\s*채널).*(?:알려|궁금|문의)?/u },
+  { knowledgeId: 'consultation-001', pattern: /(?:상담\s*방법).*(?:알려|궁금|문의|어떻게)/u },
 
   { knowledgeId: 'program-008', pattern: /(?:코치|선생님).*(?:안\s*맞|성향|관계|불편|변경|바꾸)/u },
   { knowledgeId: 'program-007', pattern: /(?:온라인|비대면|화상|영상|지방).*(?:코칭|수업|참여|받|가능)/u },
@@ -36,7 +51,9 @@ const COACH_MYWAY_RULES: CuratedIntentRule[] = [
   { knowledgeId: 'fit-011', pattern: /(?:자기주도|스스로|혼자\s*공부|시키지\s*않으면)/u },
   { knowledgeId: 'fit-010', pattern: /(?:시험|중간고사|기말고사|내신).*(?:급|코앞|얼마\s*안|지금\s*시작)/u },
   { knowledgeId: 'fit-009', pattern: /(?:고등학생|고등부|고[123]|대입).*(?:대상|가능|받|포함)/u },
+  { knowledgeId: 'fit-009', pattern: /(?:고등학생|고등부|고[123]).*(?:코칭|수업|프로그램)/u },
   { knowledgeId: 'fit-008', pattern: /(?:중학생|중등|중[123]|중학교).*(?:대상|가능|받|신청|운영)/u },
+  { knowledgeId: 'fit-008', pattern: /(?:중학생|중등|중[123]|중학교).*(?:코칭|수업|프로그램)/u },
   { knowledgeId: 'fit-007', pattern: /(?:전과목|전체\s*과목|여러\s*과목|국영수|한\s*과목이\s*아니라|전반적인\s*학습).*(?:관리|모두|한꺼번에|가능|받|보)/u },
   { knowledgeId: 'fit-006', pattern: /(?:한\s*과목|특정\s*과목|수학|영어).*(?:약|어렵|힘들|고민|코칭)/u },
   { knowledgeId: 'fit-005', pattern: /(?:동기|의지|의욕|왜\s*공부).*(?:없|낮|모르|만들|필요)/u },
@@ -67,6 +84,12 @@ const COACH_MYWAY_RULES: CuratedIntentRule[] = [
 export function matchCuratedKnowledgeId(query: string, botId: string): string | undefined {
   if (botId !== 'coach-myway') return undefined;
   const normalized = normalizeText(query);
-  const compact = normalized.replace(/\s/gu, '');
-  return COACH_MYWAY_RULES.find((rule) => rule.pattern.test(normalized) || rule.pattern.test(compact))?.knowledgeId;
+  const corrected = normalized.split(/(?:아니라|아니고|정확히는|정정하면)/u).at(-1)?.trim();
+  const values = corrected && corrected !== normalized ? [corrected, normalized] : [normalized];
+  for (const value of values) {
+    const compact = value.replace(/\s/gu, '');
+    const matched = COACH_MYWAY_RULES.find((rule) => rule.pattern.test(value) || rule.pattern.test(compact));
+    if (matched) return matched.knowledgeId;
+  }
+  return undefined;
 }

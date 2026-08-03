@@ -4,16 +4,20 @@ import type {
   ConversationContext,
   ConversationEngineVariant,
   ConversationResolution,
+  KnowledgeItem,
+  SearchResult,
   SmallTalkConfig,
   SmallTalkIntentId,
   SmallTalkRule,
 } from '../types/chatbot';
+import { analyzeConversationInput, correctionHistory, type ConversationInputAnalysis } from './analyzeConversation';
 import { composeResponsePlan } from './composeResponsePlan';
+import { detectAmbiguousQuery } from './detectAmbiguousQuery';
 import { classifyGuardedQuery } from './detectUnsupportedQuery';
 import { normalizeText } from './normalizeText';
 import { extractQueryFeatures } from './queryFeatures';
 import { routeConversationQuery } from './routeConversationQuery';
-import { searchKnowledge } from './searchKnowledge';
+import { findKnowledgeById, searchKnowledge } from './searchKnowledge';
 
 const MAX_INPUT_LENGTH = 300;
 const REPEATED_CHARACTER = /^(.)\1{3,}$/u;
@@ -77,7 +81,16 @@ function matchesRule(query: string, rule: NormalizedRule): boolean {
   return rule.normalizedUtterances.some((utterance) => query === utterance || isSafeNearMatch(query, utterance));
 }
 
-function smallTalkResolution(originalQuery: string, effectiveQuery: string, rule: NormalizedRule): ConversationResolution {
+function smallTalkResolution(
+  originalQuery: string,
+  effectiveQuery: string,
+  rule: NormalizedRule,
+  previous?: ConversationContext,
+  analysis?: ConversationInputAnalysis,
+): ConversationResolution {
+  const frustrationLevel = rule.intentId === 'frustration' || rule.intentId === 'abuse'
+    ? Math.min(3, (previous?.frustrationLevel ?? 0) + 1)
+    : previous?.frustrationLevel ?? 0;
   return {
     kind: 'smalltalk',
     originalQuery,
@@ -87,6 +100,24 @@ function smallTalkResolution(originalQuery: string, effectiveQuery: string, rule
     handoffCta: rule.handoffCta,
     showSuggestions: rule.showSuggestions,
     answerTrust: 'verified',
+    segments: analysis?.segments,
+    dialogueActs: analysis?.dialogueActs,
+    contextPatch: {
+      lastIntentId: previous?.lastIntentId,
+      lastKnowledgeIds: previous?.lastKnowledgeIds ?? [],
+      entities: { ...(previous?.entities ?? {}), ...(analysis?.entities ?? {}) },
+      pendingCandidateIds: previous?.pendingCandidateIds ?? [],
+      turnCount: (previous?.turnCount ?? 0) + 1,
+      updatedAt: Date.now(),
+      audience: analysis?.audience ?? previous?.audience ?? 'unknown',
+      activeGoal: previous?.activeGoal,
+      openIntentIds: previous?.openIntentIds ?? [],
+      answeredIntentIds: previous?.answeredIntentIds ?? [],
+      lastDialogueAct: analysis?.dialogueActs[0],
+      lastBotAction: rule.handoffCta ? 'handoff' : 'smalltalk',
+      frustrationLevel,
+      correctionHistory: previous?.correctionHistory ?? [],
+    },
   };
 }
 
@@ -95,15 +126,27 @@ function contextPatch(
   result: ReturnType<typeof searchKnowledge>,
   previous?: ConversationContext,
   clarification = false,
+  analysis?: ConversationInputAnalysis,
+  unresolvedSegments: string[] = [],
 ): ConversationContext {
   const features = extractQueryFeatures(query);
+  const entities = { ...features.entities, ...(analysis?.entities ?? {}) };
+  const isCorrection = analysis?.dialogueActs.includes('correct') ?? false;
   if (clarification && previous) {
     return {
       ...previous,
-      entities: { ...previous.entities, ...features.entities },
+      entities: { ...previous.entities, ...entities },
       pendingCandidateIds: result.suggestions.map((item) => item.id),
       turnCount: previous.turnCount + 1,
       updatedAt: Date.now(),
+      audience: analysis?.audience ?? previous.audience,
+      openIntentIds: unresolvedSegments,
+      lastDialogueAct: analysis?.dialogueActs[0],
+      lastBotAction: 'clarify',
+      frustrationLevel: analysis?.relationshipIntent === 'frustration'
+        ? Math.min(3, (previous.frustrationLevel ?? 0) + 1)
+        : previous.frustrationLevel ?? 0,
+      correctionHistory: correctionHistory(previous, entities, isCorrection),
     };
   }
 
@@ -111,10 +154,20 @@ function contextPatch(
   return {
     lastIntentId: items[0]?.intentId ?? previous?.lastIntentId,
     lastKnowledgeIds: items.map((item) => item.id),
-    entities: { ...(previous?.entities ?? {}), ...features.entities },
+    entities: { ...(previous?.entities ?? {}), ...entities },
     pendingCandidateIds: result.status === 'suggestions' ? result.suggestions.map((item) => item.id) : [],
     turnCount: (previous?.turnCount ?? 0) + 1,
     updatedAt: Date.now(),
+    audience: analysis?.audience ?? previous?.audience ?? 'unknown',
+    activeGoal: items[0]?.intentId ?? previous?.activeGoal,
+    openIntentIds: unresolvedSegments,
+    answeredIntentIds: [...new Set([...(previous?.answeredIntentIds ?? []), ...items.map((item) => item.intentId ?? item.id)])].slice(-12),
+    lastDialogueAct: analysis?.dialogueActs[0],
+    lastBotAction: result.status === 'fallback' ? 'fallback' : 'answer',
+    frustrationLevel: analysis?.relationshipIntent === 'frustration'
+      ? Math.min(3, (previous?.frustrationLevel ?? 0) + 1)
+      : previous?.frustrationLevel ?? 0,
+    correctionHistory: correctionHistory(previous, entities, isCorrection),
   };
 }
 
@@ -125,12 +178,176 @@ function knowledgeResolution(
   intentId?: string,
   context?: ConversationContext,
   variant?: ConversationEngineVariant,
+  analysis: ConversationInputAnalysis = analyzeConversationInput(effectiveQuery, context),
 ): ConversationResolution {
-  const route = routeConversationQuery(effectiveQuery, botConfig, { intentId, context, variant });
+  const phase4Enabled = variant !== 'baseline' && variant !== 'phase3';
+  const engineConfig = phase4Enabled
+    ? botConfig
+    : { ...botConfig, knowledge: botConfig.knowledge.filter((item) => !item.id.startsWith('advice-')) };
+  const resetContext = phase4Enabled && (analysis.dialogueActs.includes('restart') || analysis.dialogueActs.includes('switch-topic'));
+  const previous = resetContext ? undefined : context;
+  const routingContext = phase4Enabled && previous && analysis.dialogueActs.includes('correct')
+    ? { ...previous, entities: { ...previous.entities, ...analysis.entities } }
+    : previous;
+  const candidateIds = routingContext?.pendingCandidateIds.length
+    ? routingContext.pendingCandidateIds
+    : routingContext?.lastKnowledgeIds ?? [];
+  const selectedItem = analysis.selectedIndex !== undefined
+    ? findKnowledgeById(engineConfig, candidateIds[analysis.selectedIndex] ?? '')
+    : undefined;
+  const controlStyle = analysis.dialogueActs.includes('shorten')
+    ? 'short' as const
+    : analysis.dialogueActs.includes('summarize')
+      ? 'summary' as const
+      : analysis.dialogueActs.includes('confirm')
+        ? 'confirmation' as const
+        : analysis.dialogueActs.includes('elaborate') || analysis.dialogueActs.includes('example')
+          ? 'detailed' as const
+          : 'default' as const;
+  const controlOnly = /^(?:다시|짧게|간단히|한\s*줄로|자세히|구체적으로|상세히|예시|요약|정리|맞죠|맞나요|그렇다는\s*거죠|이해한.*맞).{0,14}$/u.test(analysis.normalized);
+  const previousItems = routingContext?.lastKnowledgeIds
+    .map((id) => findKnowledgeById(engineConfig, id))
+    .filter((item): item is KnowledgeItem => Boolean(item)) ?? [];
+
+  if (phase4Enabled && (selectedItem || (controlOnly && previousItems.length))) {
+    const items = selectedItem ? [selectedItem] : previousItems;
+    const searchResult: SearchResult = {
+      status: 'answer',
+      confidence: 'high',
+      score: 1,
+      item: items[0],
+      items,
+      suggestions: items,
+      alternatives: [],
+      matchedFields: ['intent'],
+      decisionReason: 'confident',
+    };
+    const responsePlan = composeResponsePlan(effectiveQuery, searchResult, routingContext, {
+      continued: true,
+      audience: analysis.audience,
+      acknowledgement: analysis.acknowledgement,
+      responseStyle: controlStyle,
+    });
+    return {
+      kind: 'knowledge',
+      originalQuery,
+      effectiveQuery,
+      searchResult,
+      responsePlan,
+      answerTrust: responsePlan?.answerTrust,
+      contextPatch: contextPatch(effectiveQuery, searchResult, previous, false, analysis),
+      routeDecision: {
+        mode: 'contextual',
+        reason: selectedItem ? 'pending-selection' : 'same-candidate',
+        standaloneKnowledgeId: items[0]?.id,
+        contextualKnowledgeId: items[0]?.id,
+        standaloneScore: 1,
+        contextualScore: 1,
+      },
+      segments: analysis.segments,
+      resolvedIntents: items.map((item) => ({
+        segment: effectiveQuery,
+        intentId: item.intentId ?? item.id,
+        family: item.id.startsWith('advice-') ? 'advice' : 'knowledge',
+        knowledgeIds: [item.id],
+        confidence: 'high',
+      })),
+      unresolvedSegments: [],
+      dialogueActs: analysis.dialogueActs,
+    };
+  }
+
+  const explicitAmbiguity = phase4Enabled && !routingContext ? detectAmbiguousQuery(effectiveQuery, engineConfig) : undefined;
+  if (explicitAmbiguity) {
+    const searchResult = explicitAmbiguity.result;
+    return {
+      kind: 'knowledge',
+      originalQuery,
+      effectiveQuery,
+      searchResult,
+      answerTrust: 'bounded',
+      contextPatch: contextPatch(effectiveQuery, searchResult, previous, true, analysis),
+      routeDecision: {
+        mode: 'clarification',
+        reason: 'standalone-ambiguity',
+        standaloneKnowledgeId: searchResult.suggestions[0]?.id,
+        standaloneScore: searchResult.score,
+      },
+      clarificationPrompt: explicitAmbiguity.prompt,
+      segments: analysis.segments,
+      resolvedIntents: [],
+      unresolvedSegments: [effectiveQuery],
+      dialogueActs: analysis.dialogueActs,
+    };
+  }
+
+  if (phase4Enabled && analysis.knowledgeSegments.length > 1) {
+    const segmentResults = analysis.knowledgeSegments.map((segment) => ({
+      segment,
+      result: searchKnowledge(segment, engineConfig, { intentId, variant }),
+    }));
+    const items = segmentResults
+      .flatMap(({ result }) => result.status === 'answer' ? (result.items ?? (result.item ? [result.item] : [])) : [])
+      .filter((item, index, values) => values.findIndex((entry) => entry.id === item.id) === index);
+    const unresolvedSegments = segmentResults
+      .filter(({ result }) => result.status !== 'answer')
+      .map(({ segment }) => segment);
+    if (items.length) {
+      const searchResult: SearchResult = {
+        status: 'answer',
+        confidence: unresolvedSegments.length ? 'medium' : 'high',
+        score: Math.max(...segmentResults.map(({ result }) => result.score)),
+        item: items[0],
+        items,
+        suggestions: items,
+        alternatives: [],
+        matchedFields: [...new Set(segmentResults.flatMap(({ result }) => result.matchedFields))],
+        decisionReason: 'confident',
+      };
+      const responsePlan = composeResponsePlan(effectiveQuery, searchResult, routingContext, {
+        audience: analysis.audience,
+        acknowledgement: analysis.acknowledgement,
+        unresolvedSegments,
+      });
+      return {
+        kind: 'knowledge',
+        originalQuery,
+        effectiveQuery,
+        searchResult,
+        responsePlan,
+        answerTrust: responsePlan?.answerTrust,
+        contextPatch: contextPatch(effectiveQuery, searchResult, previous, false, analysis, unresolvedSegments),
+        routeDecision: {
+          mode: 'standalone', reason: 'no-context', standaloneKnowledgeId: items[0].id, standaloneScore: searchResult.score,
+        },
+        segments: analysis.segments,
+        resolvedIntents: segmentResults.flatMap(({ segment, result }) => {
+          const resolved = result.items ?? (result.item ? [result.item] : []);
+          return resolved.map((item) => ({
+            segment,
+            intentId: item.intentId ?? item.id,
+            family: item.id.startsWith('advice-') ? 'advice' as const : 'knowledge' as const,
+            knowledgeIds: [item.id],
+            confidence: result.confidence,
+          }));
+        }),
+        unresolvedSegments,
+        dialogueActs: analysis.dialogueActs,
+      };
+    }
+  }
+
+  const route = routeConversationQuery(effectiveQuery, engineConfig, { intentId, context: routingContext, variant });
   const searchResult = route.result;
   const responsePlan = route.decision.mode === 'clarification'
     ? undefined
-    : composeResponsePlan(effectiveQuery, searchResult, context, { continued: route.continued });
+    : composeResponsePlan(effectiveQuery, searchResult, routingContext, phase4Enabled ? {
+      continued: route.continued,
+      audience: analysis.audience,
+      acknowledgement: analysis.acknowledgement,
+      responseStyle: controlStyle,
+    } : { continued: route.continued });
+  const resolvedItems = searchResult.items ?? (searchResult.item ? [searchResult.item] : []);
   return {
     kind: searchResult.status === 'fallback' ? 'fallback' : 'knowledge',
     originalQuery,
@@ -138,9 +355,19 @@ function knowledgeResolution(
     searchResult,
     responsePlan,
     answerTrust: responsePlan?.answerTrust,
-    contextPatch: contextPatch(effectiveQuery, searchResult, context, route.decision.mode === 'clarification'),
+    contextPatch: contextPatch(effectiveQuery, searchResult, previous, route.decision.mode === 'clarification', analysis),
     routeDecision: route.decision,
     clarificationPrompt: route.clarificationPrompt,
+    segments: analysis.segments,
+    resolvedIntents: resolvedItems.map((item) => ({
+      segment: effectiveQuery,
+      intentId: item.intentId ?? item.id,
+      family: item.id.startsWith('advice-') ? 'advice' : 'knowledge',
+      knowledgeIds: [item.id],
+      confidence: searchResult.confidence,
+    })),
+    unresolvedSegments: searchResult.status === 'fallback' ? [effectiveQuery] : [],
+    dialogueActs: analysis.dialogueActs,
   };
 }
 
@@ -203,9 +430,10 @@ export function resolveConversation(
   botConfig: BotConfig,
   options?: { intentId?: string; context?: ConversationContext; variant?: ConversationEngineVariant },
 ): ConversationResolution {
+  const analysis = analyzeConversationInput(query, options?.context);
   const smallTalk = resolveSmallTalkConfig(botConfig.bot, botConfig.smallTalk);
   if (!smallTalk.enabled) {
-    return knowledgeResolution(query, query, botConfig, options?.intentId, options?.context, options?.variant);
+    return knowledgeResolution(query, query, botConfig, options?.intentId, options?.context, options?.variant, analysis);
   }
 
   const rules = normalizedRules(smallTalk);
@@ -213,7 +441,7 @@ export function resolveConversation(
   const noiseRule = rules.find((rule) => rule.intentId === 'noise');
   const compact = normalized.replace(/\s/g, '');
   if ((!normalized || query.length > MAX_INPUT_LENGTH || REPEATED_CHARACTER.test(compact)) && noiseRule) {
-    return smallTalkResolution(query, normalized, noiseRule);
+    return smallTalkResolution(query, normalized, noiseRule, options?.context, analysis);
   }
 
   const guardDecision = options?.variant === 'baseline' ? undefined : classifyGuardedQuery(query);
@@ -240,22 +468,28 @@ export function resolveConversation(
         reason: 'guarded',
         standaloneScore: 0,
       },
+      segments: analysis.segments,
+      unresolvedSegments: [query],
+      dialogueActs: analysis.dialogueActs,
     };
   }
 
   const priorityRule = rules.find((rule) =>
     (rule.intentId === 'human' || rule.intentId === 'abuse') && matchesRule(normalized, rule),
   );
-  if (priorityRule) return smallTalkResolution(query, normalized, priorityRule);
+  if (priorityRule) return smallTalkResolution(query, normalized, priorityRule, options?.context, analysis);
 
-  const standaloneRule = rules.find((rule) => matchesRule(normalized, rule));
-  if (standaloneRule) return smallTalkResolution(query, normalized, standaloneRule);
+  // Resolve exact catalog entries before typo tolerance so similar emotional
+  // expressions such as "미안해요" and "불안해요" cannot cross-match.
+  const exactRule = rules.find((rule) => rule.normalizedUtterances.includes(normalized));
+  const standaloneRule = exactRule ?? rules.find((rule) => matchesRule(normalized, rule));
+  if (standaloneRule) return smallTalkResolution(query, normalized, standaloneRule, options?.context, analysis);
 
   const stripped = stripSocialWrappers(normalized, rules);
   if (stripped.query !== normalized) {
-    if (!stripped.query && stripped.matchedRule) return smallTalkResolution(query, normalized, stripped.matchedRule);
-    return knowledgeResolution(query, stripped.query, botConfig, options?.intentId, options?.context, options?.variant);
+    if (!stripped.query && stripped.matchedRule) return smallTalkResolution(query, normalized, stripped.matchedRule, options?.context, analysis);
+    return knowledgeResolution(query, stripped.query, botConfig, options?.intentId, options?.context, options?.variant, analysis);
   }
 
-  return knowledgeResolution(query, query, botConfig, options?.intentId, options?.context, options?.variant);
+  return knowledgeResolution(query, query, botConfig, options?.intentId, options?.context, options?.variant, analysis);
 }

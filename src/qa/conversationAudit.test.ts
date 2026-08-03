@@ -39,11 +39,11 @@ describe('conversation accuracy and suitability audit', () => {
     expect(first.candidates.every((candidate) => candidate.question && candidate.sourceStatus)).toBe(true);
   });
 
-  it('audits 400 turns across both variants and all 50 answers', () => {
+  it('audits 400 turns across both variants and all 70 answers', () => {
     const result = fullAudit;
     expect(result.cases).toHaveLength(400);
     expect(result.records).toHaveLength(800);
-    expect(result.knowledgeAudits).toHaveLength(50);
+    expect(result.knowledgeAudits).toHaveLength(70);
     expect(result.summary.byCategory).toEqual({
       'faq-coverage': 150,
       robustness: 60,
@@ -64,10 +64,10 @@ describe('conversation accuracy and suitability audit', () => {
     expect(findings.has('source-confidence-mismatch')).toBe(false);
     expect(result.summary.candidate.calibrationFailures).toBe(0);
     expect(result.summary.knowledge).toMatchObject({
-      known: 4,
+      known: 24,
       draftSafe: 46,
       unverifiable: 46,
-      direct: 50,
+      direct: 70,
       genericOrDeflective: 0,
     });
     expect(renderConversationAuditMarkdown(result)).toContain('Candidate 실패 trace');

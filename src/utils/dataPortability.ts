@@ -49,7 +49,11 @@ export function validateBotConfig(value: unknown): ValidationResult {
       errors.push('smallTalk must be an object when provided');
     } else {
       const smallTalk = value.smallTalk;
-      const allowedIntents = new Set<SmallTalkIntentId>(['greeting', 'thanks', 'goodbye', 'help', 'identity', 'human', 'abuse', 'noise']);
+      const allowedIntents = new Set<SmallTalkIntentId>([
+        'greeting', 'thanks', 'goodbye', 'help', 'identity', 'human', 'abuse', 'noise',
+        'positive', 'worry', 'frustration', 'confusion', 'urgency', 'indecision',
+        'skepticism', 'apology', 'praise', 'social',
+      ]);
       if (typeof smallTalk.enabled !== 'boolean') errors.push('smallTalk.enabled must be a boolean');
       if (!Array.isArray(smallTalk.rules)) {
         errors.push('smallTalk.rules must be an array');

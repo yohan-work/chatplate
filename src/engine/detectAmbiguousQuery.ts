@@ -18,6 +18,9 @@ export interface AmbiguousQueryDecision {
 // them explicit makes every clarification auditable and prevents a confident
 // answer from being manufactured from a weak lexical match.
 const AMBIGUITY_RULES: AmbiguityRule[] = [
+  { pattern: /(?:부모|학부모).*(?:같이|함께|동반).*(?:해야|가야|필요)/u, excludedBy: /(?:상담|코칭|방문)/u, candidateIds: ['consultation-005', 'consultation-006'], prompt: '학부모만 먼저 상담할 수 있는지, 학생과 함께 상담해야 하는지 중 어느 쪽이 궁금하신가요?' },
+  { pattern: /(?:취소|그만).*(?:어떻게|방법|절차)/u, excludedBy: /(?:상담|예약|등록|코칭|환불)/u, candidateIds: ['consultation-008', 'policy-002', 'policy-005'], prompt: '상담 예약 취소와 등록·코칭 취소 및 환불 중 어느 쪽이 궁금하신가요?' },
+  { pattern: /(?:그건|그거|그\s*부분|그\s*내용).*(?:어떻게|뭐|무엇)/u, candidateIds: ['intro-001', 'program-001'], prompt: '앞선 대화가 없어 어떤 내용을 가리키는지 확인하기 어려워요. 서비스 소개와 코칭 방식 중 어느 쪽이 궁금하신가요?' },
   { pattern: /일정.*(?:어떻게|언제|잡)/u, excludedBy: /(?:상담|예약|코칭|수업|등록|신청|변경|해지|취소)/u, candidateIds: ['hours-001', 'program-005', 'consultation-008'], prompt: '상담 가능 시간, 코칭 일정, 예약 변경 중 어느 일정을 확인하실까요?' },
   { pattern: /(?:시간.*잡|몇\s*번|얼마나\s*자주)/u, excludedBy: /(?:상담|문의|답변|코칭|코치|세션)/u, candidateIds: ['hours-001', 'program-005', 'consultation-008'], prompt: '상담 가능한 시간, 코칭 횟수, 예약 변경 중 어떤 내용을 확인하실까요?' },
   { pattern: /(?:그건|그거|이건)?.*(?:나중|중간).*(?:바꿔|바꿀|바꾸|변경|취소)/u, excludedBy: /(?:상담|예약|코치|수업|코칭|등록|환불)/u, candidateIds: ['policy-004', 'consultation-008', 'program-008'], prompt: '코칭 방식, 상담 일정, 코치 중 무엇을 변경하려는지 알려 주세요.' },

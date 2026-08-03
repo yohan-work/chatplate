@@ -2,6 +2,7 @@ import alfDemo from './alf-demo.json';
 import animalHospital from './animal-hospital.json';
 import cafe from './cafe.json';
 import coachMyway from './coach-myway.json';
+import { coachMywayAdviceKnowledge } from './coach-myway-advice';
 import { coachMywayDraftKnowledge } from './coach-myway-drafts';
 import { enrichCoachMywayDataset } from './coach-myway-utterances';
 import { createDefaultSmallTalkConfig } from './smallTalkDefaults';
@@ -20,6 +21,9 @@ function withCoachQualitySeeds(config: BotConfig): BotConfig {
   const seedById = new Map(SUPPORTED_SEEDS.map(([id, query]) => [id, query]));
   return {
     ...config,
+    categories: config.categories.some((category) => category.id === 'advice')
+      ? config.categories
+      : [...config.categories, { id: 'advice', name: '학습 조언' }],
     knowledge: config.knowledge.map((item) => {
       const text = seedById.get(item.id);
       if (!text) return item;
@@ -50,7 +54,11 @@ export const botConfigs: Record<string, BotConfig> = {
   cafe: withSmallTalk(cafe as BotConfig),
   'coach-myway': withCoachQualitySeeds(withSmallTalk({
     ...(coachMyway as BotConfig),
-    knowledge: enrichCoachMywayDataset([...(coachMyway as BotConfig).knowledge, ...coachMywayDraftKnowledge]),
+    knowledge: enrichCoachMywayDataset([
+      ...(coachMyway as BotConfig).knowledge,
+      ...coachMywayDraftKnowledge,
+      ...coachMywayAdviceKnowledge,
+    ]),
   })),
 };
 

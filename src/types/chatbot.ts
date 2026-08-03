@@ -106,7 +106,91 @@ export interface SearchConfig {
   clarificationFlows?: ClarificationFlow[];
 }
 
-export type SmallTalkIntentId = 'greeting' | 'thanks' | 'goodbye' | 'help' | 'identity' | 'human' | 'abuse' | 'noise';
+export type SmallTalkIntentId =
+  | 'greeting'
+  | 'thanks'
+  | 'goodbye'
+  | 'help'
+  | 'identity'
+  | 'human'
+  | 'abuse'
+  | 'noise'
+  | 'positive'
+  | 'worry'
+  | 'frustration'
+  | 'confusion'
+  | 'urgency'
+  | 'indecision'
+  | 'skepticism'
+  | 'apology'
+  | 'praise'
+  | 'social';
+
+export type ConversationAudience = 'parent' | 'student' | 'unknown';
+export type ConversationIntentFamily = 'knowledge' | 'advice' | 'relationship' | 'control';
+export type ConversationPriorityTier = 'high' | 'medium' | 'low';
+export type DialogueAct =
+  | 'ask'
+  | 'acknowledge'
+  | 'correct'
+  | 'exclude'
+  | 'select'
+  | 'repeat'
+  | 'shorten'
+  | 'elaborate'
+  | 'example'
+  | 'summarize'
+  | 'compare'
+  | 'confirm'
+  | 'switch-topic'
+  | 'restart'
+  | 'handoff'
+  | 'emotion';
+
+export interface ConversationUtterance {
+  text: string;
+  audience: ConversationAudience;
+  variation: UtteranceVariation;
+  split: 'train' | 'dev' | 'test';
+  negativeFor?: string[];
+}
+
+export interface ConversationIntentSpec {
+  id: string;
+  family: ConversationIntentFamily;
+  label: string;
+  priorityTier: ConversationPriorityTier;
+  audiences: ConversationAudience[];
+  requiredSlots: string[];
+  knowledgeIds: string[];
+  responsePolicy: 'answer' | 'safe-advice' | 'relationship' | 'control' | 'clarify' | 'handoff';
+  utterances: ConversationUtterance[];
+  negativeUtterances: string[];
+}
+
+export interface AdviceCard {
+  id: string;
+  label: string;
+  summary: string;
+  actions: string[];
+  caveat: string;
+  followUp: string;
+  escalationTriggers: string[];
+}
+
+export interface ConversationSegment {
+  text: string;
+  dialogueActs: DialogueAct[];
+  excluded: boolean;
+}
+
+export interface ResolvedConversationIntent {
+  segment: string;
+  intentId: string;
+  family: ConversationIntentFamily;
+  knowledgeIds: string[];
+  confidence: SearchConfidence;
+}
 
 export interface SmallTalkRule {
   id: string;
@@ -131,6 +215,7 @@ export type KnowledgeRisk = 'low' | 'policy' | 'personal';
 export type KnowledgeApprovalStatus = 'verified' | 'pending' | 'unknown';
 export type AnswerTrust = 'verified' | 'bounded' | 'unverified';
 export type GuardCategory =
+  | 'crisis'
   | 'third-party-data'
   | 'sensitive-data'
   | 'private-contact'
@@ -275,6 +360,14 @@ export interface ConversationContext {
   pendingCandidateIds: string[];
   turnCount: number;
   updatedAt: number;
+  audience?: ConversationAudience;
+  activeGoal?: string;
+  openIntentIds?: string[];
+  answeredIntentIds?: string[];
+  lastDialogueAct?: DialogueAct;
+  lastBotAction?: 'answer' | 'clarify' | 'fallback' | 'handoff' | 'smalltalk';
+  frustrationLevel?: number;
+  correctionHistory?: Array<{ entity: string; from?: string; to: string }>;
 }
 
 export interface ResponsePlan {
@@ -286,7 +379,7 @@ export interface ResponsePlan {
 }
 
 export type ConversationRouteMode = 'standalone' | 'contextual' | 'clarification' | 'fallback';
-export type ConversationEngineVariant = 'baseline' | 'candidate';
+export type ConversationEngineVariant = 'baseline' | 'phase3' | 'candidate';
 
 export interface ConversationRouteDecision {
   mode: ConversationRouteMode;
@@ -338,6 +431,10 @@ export interface ConversationResolution {
   contextPatch?: ConversationContext;
   routeDecision?: ConversationRouteDecision;
   clarificationPrompt?: string;
+  segments?: ConversationSegment[];
+  resolvedIntents?: ResolvedConversationIntent[];
+  unresolvedSegments?: string[];
+  dialogueActs?: DialogueAct[];
 }
 
 export interface ConversationEvent {

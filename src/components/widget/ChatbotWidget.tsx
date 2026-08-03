@@ -428,6 +428,7 @@ export function ChatbotWidget({
       }
 
       const resolution = resolveConversation(query, botConfig, { intentId: selectedIntentId, context: conversationContext });
+      if (resolution.contextPatch) setConversationContext(resolution.contextPatch);
       let botMessage: ChatMessage;
 
       if (resolution.kind === 'smalltalk') {
@@ -443,7 +444,6 @@ export function ChatbotWidget({
         });
       } else {
         const result = resolution.searchResult ?? searchKnowledge(query, botConfig, { intentId: selectedIntentId });
-        if (resolution.contextPatch) setConversationContext(resolution.contextPatch);
         const event = createConversationEvent(
           botConfig.bot.id,
           query,

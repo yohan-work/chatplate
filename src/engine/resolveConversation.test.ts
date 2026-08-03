@@ -75,6 +75,15 @@ describe('resolveConversation', () => {
     expect(result.handoffCta).toBe(true);
   });
 
+  it('routes a self-harm crisis to immediate human help before learning advice', () => {
+    const result = resolveConversation('시험 때문에 너무 힘들고 죽고 싶어요', coach);
+    expect(result.kind).toBe('fallback');
+    expect(result.guardDecision?.category).toBe('crisis');
+    expect(result.replyText).toContain('109');
+    expect(result.replyText).toContain('1388');
+    expect(result.handoffCta).toBe(true);
+  });
+
   it.each([
     ['매번 작심삼일로 끝나요', 'fit-003'],
     ['지방에서도 영상으로 코칭받을 수 있나요', 'program-007'],
@@ -171,7 +180,7 @@ describe('resolveConversation', () => {
     const config = createDefaultSmallTalkConfig(coach.bot);
     const values = config.rules.flatMap((rule) => rule.utterances.map(normalizeText));
     expect(values.length).toBeGreaterThanOrEqual(120);
-    expect(values.length).toBeLessThanOrEqual(160);
+    expect(values.length).toBeLessThanOrEqual(220);
     expect(new Set(values).size).toBe(values.length);
     expect(validateSmallTalkConfig(config)).toEqual([]);
   });

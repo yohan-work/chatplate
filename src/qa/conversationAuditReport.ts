@@ -31,7 +31,7 @@ export function createConversationAudit(config: BotConfig): ConversationAuditRes
   ];
   if (legacyCases.length !== 240) errors.push(`legacy audit case count must be 240, received ${legacyCases.length}`);
   if (cases.length !== 400) errors.push(`combined audit case count must be 400, received ${cases.length}`);
-  if (config.knowledge.length !== 50) errors.push(`knowledge count must be 50, received ${config.knowledge.length}`);
+  if (config.knowledge.length !== 70) errors.push(`knowledge count must be 70, received ${config.knowledge.length}`);
   if (errors.length) throw new Error(`Conversation audit data is invalid:\n- ${[...new Set(errors)].join('\n- ')}`);
 
   const variants: ConversationEngineVariant[] = ['baseline', 'candidate'];
@@ -91,7 +91,7 @@ export function renderConversationAuditMarkdown(result: ConversationAuditResult)
       `| ${finding.priority} | ${finding.code} | ${finding.count} | ${cell(finding.description)} | ${finding.caseIds.map(cell).join(', ')} |`,
     ),
     '',
-    '## FAQ 50개 답변 감사',
+    `## FAQ ${knowledgeAudits.length}개 답변 감사`,
     '',
     `- known source ${summary.knowledge.known}개, draft-safe ${summary.knowledge.draftSafe}개, 사실 검증 불가 ${summary.knowledge.unverifiable}개`,
     `- 직접 답변 ${summary.knowledge.direct}개, 공통·회피성 답변 ${summary.knowledge.genericOrDeflective}개`,
