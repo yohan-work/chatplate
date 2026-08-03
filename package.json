@@ -15,6 +15,13 @@
     "qa:conversation:parity:holdout": "vite-node src/qa/runConversationParity.ts holdout",
     "qa:conversation:parity:holdout-json": "vite-node src/qa/runConversationParity.ts holdout-json",
     "qa:conversation:parity:generate": "vite-node src/qa/runConversationParity.ts generate",
+    "qa:dataset:validate": "vite-node src/qa/runConversationDataset.ts validate",
+    "qa:dataset:coverage": "vite-node src/qa/runConversationDataset.ts coverage",
+    "qa:dataset:leakage": "vite-node src/qa/runConversationDataset.ts leakage",
+    "qa:dataset:freeze": "vite-node src/qa/runConversationDataset.ts freeze",
+    "qa:dataset:evaluate": "vite-node src/qa/runConversationDataset.ts evaluate all",
+    "qa:dataset:sealed": "vite-node src/qa/runConversationDataset.ts evaluate sealed",
+    "qa:dataset:import-events": "vite-node src/qa/runConversationDataset.ts import-events",
     "qa:conversation:phase4": "vite-node src/qa/runPhase4Conversation.ts",
     "test": "vitest run"
   },
