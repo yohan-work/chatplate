@@ -1,7 +1,7 @@
 {
   "bot": {
     "id": "coach-myway",
-    "name": "코치 마이:웨이",
+    "name": "샤학관",
     "title": "학습 코칭 상담 안내",
     "description": "학습 코칭, 상담, 등록 관련 자주 묻는 질문을 안내합니다.",
     "avatarUrl": "",
