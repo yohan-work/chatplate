@@ -19,6 +19,7 @@ export function createConversationEvent(
   result: SearchResult,
   effectiveQuery = query,
   routeDecision?: ConversationRouteDecision,
+  resolution?: Pick<ConversationResolution, 'answerTrust' | 'guardDecision'>,
 ): ConversationEvent {
   const matchedItems = result.items ?? (result.item ? [result.item] : []);
   const candidateItems = [...matchedItems, ...result.suggestions, ...result.alternatives];
@@ -29,6 +30,8 @@ export function createConversationEvent(
     query,
     status: result.status,
     confidence: result.confidence,
+    answerTrust: resolution?.answerTrust,
+    guardCategory: resolution?.guardDecision?.category,
     interactionType: result.status === 'fallback' ? 'fallback' : 'knowledge',
     effectiveQuery,
     matchedKnowledgeIds: matchedItems.map((item) => item.id),
@@ -54,6 +57,7 @@ export function createSmallTalkConversationEvent(botId: string, resolution: Conv
     query: resolution.originalQuery,
     status: 'smalltalk',
     confidence: 'high',
+    answerTrust: resolution.answerTrust,
     interactionType: 'smalltalk',
     effectiveQuery: resolution.effectiveQuery,
     smallTalkIntent: resolution.smallTalkIntent,

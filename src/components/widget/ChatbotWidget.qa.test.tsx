@@ -52,7 +52,8 @@ describe('customer widget conversation QA', () => {
 
     await submit('카카오 계정 비밀번호를 알려줄게');
     expect(results.at(-1)?.result.status).toBe('fallback');
-    expect((await screen.findAllByText(botConfigs['coach-myway'].bot.fallbackMessage))).toHaveLength(2);
+    expect(await screen.findByText(/비밀번호.*민감한 정보는 채팅에 입력하거나 저장하지 마세요/u)).toBeTruthy();
+    expect(await screen.findByText(/의학적.*진단은 이 챗봇이 판단할 수 없어요/u)).toBeTruthy();
     expect(screen.getAllByRole('button', { name: '상담원 연결' }).length).toBeGreaterThan(0);
   });
 });

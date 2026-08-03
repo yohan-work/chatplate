@@ -190,6 +190,18 @@
   background: #171717;
 }
 
+.bot-mark {
+  background: #fff;
+}
+
+.bot-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
 .avatar {
   object-fit: cover;
   font-weight: 700;

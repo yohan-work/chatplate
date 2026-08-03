@@ -89,6 +89,7 @@ export function supportMessageToChatMessage(
       minute: '2-digit',
     }).format(new Date(message.createdAt)),
     confidence: message.confidence,
+    answerTrust: message.metadata?.answerTrust,
     matchedKnowledgeIds: message.matchedKnowledgeIds,
     buttons: message.metadata?.buttons,
     suggestions: message.metadata?.suggestionKnowledgeIds?.flatMap((id) => {

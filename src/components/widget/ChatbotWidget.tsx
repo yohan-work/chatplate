@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, RefObject } from 'react';
-import { Bot, History, SquarePen, X } from 'lucide-react';
+import { History, SquarePen, X } from 'lucide-react';
+import { coachBotMark } from '../../assets/coachBotMark';
 import { getFallbackSuggestions } from '../../engine/getFallbackSuggestions';
+import { answerTrustFor } from '../../engine/answerTrust';
 import { resolveConversation } from '../../engine/resolveConversation';
 import { findKnowledgeById, searchKnowledge } from '../../engine/searchKnowledge';
 import {
@@ -75,11 +77,6 @@ function createMessage(role: ChatMessage['role'], text: string, extra?: Partial<
     createdAt: new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit' }).format(new Date()),
     ...extra,
   };
-}
-
-function confidencePrefix(confidence: ChatMessage['confidence']): string {
-  if (confidence === 'medium') return '가장 가까운 답변이에요.\n\n';
-  return '';
 }
 
 export function ChatbotWidget({
@@ -157,6 +154,7 @@ export function ChatbotWidget({
         relatedKnowledgeIds: message.relatedQuestions?.map((item) => item.id),
         clarificationOptions: message.clarificationOptions,
         handoffCta: message.handoffCta,
+        answerTrust: message.answerTrust,
         feedback: message.feedback,
       },
     });
@@ -322,6 +320,7 @@ export function ChatbotWidget({
         buttons: item.buttons,
         matchedKnowledgeIds: [item.id],
         handoffCta: Boolean(item.handoffRecommended),
+        answerTrust: answerTrustFor(item),
       })
       : undefined;
     setMessages((current) => [...current, userMessage]);
@@ -438,13 +437,21 @@ export function ChatbotWidget({
         botMessage = createMessage('bot', resolution.replyText ?? botConfig.bot.fallbackMessage, {
           suggestions: resolution.showSuggestions ? getFallbackSuggestions(botConfig) : undefined,
           confidence: 'high',
+          answerTrust: resolution.answerTrust,
           handoffCta: resolution.handoffCta,
           id: event.id,
         });
       } else {
         const result = resolution.searchResult ?? searchKnowledge(query, botConfig, { intentId: selectedIntentId });
         if (resolution.contextPatch) setConversationContext(resolution.contextPatch);
-        const event = createConversationEvent(botConfig.bot.id, query, result, resolution.effectiveQuery, resolution.routeDecision);
+        const event = createConversationEvent(
+          botConfig.bot.id,
+          query,
+          result,
+          resolution.effectiveQuery,
+          resolution.routeDecision,
+          resolution,
+        );
         if (repository.kind === 'local') appendConversationEvent(event);
         else void analyticsRepository.record(supportConversation.id, event).catch(() => undefined);
         if (resolution.routeDecision?.mode === 'clarification') setPendingClarificationEventId(event.id);
@@ -458,24 +465,27 @@ export function ChatbotWidget({
           botMessage = createMessage('bot', resolution.clarificationPrompt ?? '새 질문인지, 앞선 문의를 이어가는 것인지 확인해 주세요.', {
             suggestions: result.suggestions,
             confidence: 'medium',
+            answerTrust: 'bounded',
             id: event.id,
           });
         } else if (clarification) {
           botMessage = createMessage('bot', clarification.prompt, {
             clarificationOptions: clarification.options,
             confidence: 'medium',
+            answerTrust: 'bounded',
             id: event.id,
           });
         } else if (result.status === 'answer' && result.item) {
           const items = result.items ?? [result.item];
           const answerText = resolution.responsePlan?.text ?? items.map((item) => item.answer).join('\n\n');
-          botMessage = createMessage('bot', `${confidencePrefix(result.confidence)}${answerText}`, {
+          botMessage = createMessage('bot', answerText, {
             buttons: result.item.buttons,
             relatedQuestions: result.alternatives,
             suggestions: result.confidence === 'medium'
               ? result.suggestions.filter((item) => item.id !== result.item?.id)
               : undefined,
             confidence: result.confidence,
+            answerTrust: resolution.answerTrust,
             matchedKnowledgeIds: items.map((item) => item.id),
             handoffCta: result.confidence === 'low' || items.some((item) => item.handoffRecommended),
             id: event.id,
@@ -484,16 +494,18 @@ export function ChatbotWidget({
           botMessage = createMessage('bot', '혹시 이 질문을 찾으셨나요?', {
             suggestions: result.suggestions,
             confidence: result.confidence,
+            answerTrust: 'bounded',
             handoffCta: true,
             id: event.id,
           });
         } else {
           setUnknownQuestions((current) => [...current, query]);
           onUnknownQuestion?.(query);
-          botMessage = createMessage('bot', botConfig.bot.fallbackMessage, {
+          botMessage = createMessage('bot', resolution.replyText ?? botConfig.bot.fallbackMessage, {
             suggestions: getFallbackSuggestions(botConfig),
             confidence: result.confidence,
-            handoffCta: true,
+            answerTrust: resolution.answerTrust ?? 'bounded',
+            handoffCta: resolution.handoffCta ?? true,
             id: event.id,
           });
         }
@@ -601,7 +613,7 @@ export function ChatbotWidget({
       <header className="widget-topbar">
         <button className="widget-topbar__brand" type="button" onClick={() => setActiveView('home')} aria-label="챗봇 홈으로 이동">
           <span className="bot-mark">
-            <Bot size={19} aria-hidden="true" />
+            <img src={coachBotMark} alt="" aria-hidden="true" />
           </span>
           <div>
             <strong>{botConfig.bot.name}</strong>
