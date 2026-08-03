@@ -24,7 +24,7 @@ export function searchKnowledge(
     ? undefined
     : matchedCuratedKnowledgeId;
   const curatedItem = curatedKnowledgeId ? findKnowledgeById(botConfig, curatedKnowledgeId) : undefined;
-  if (curatedItem && (curatedItem.status ?? 'active') === 'active') {
+  if (analysis.intents.length === 1 && curatedItem && (curatedItem.status ?? 'active') === 'active') {
     const relatedItems = curatedItem.relatedIds
       .map((id) => findKnowledgeById(botConfig, id))
       .filter((item): item is KnowledgeItem => Boolean(item))
@@ -45,6 +45,21 @@ export function searchKnowledge(
 
   if (analysis.intents.length > 1) {
     const intentResults = analysis.intents.map((intent) => {
+      const intentCuratedId = options?.variant === 'baseline' ? undefined : matchCuratedKnowledgeId(intent, botConfig.bot.id);
+      const intentCuratedItem = intentCuratedId ? findKnowledgeById(botConfig, intentCuratedId) : undefined;
+      if (intentCuratedItem && (intentCuratedItem.status ?? 'active') === 'active') {
+        return {
+          status: 'answer' as const,
+          confidence: 'high' as const,
+          score: 0.98,
+          item: intentCuratedItem,
+          items: [intentCuratedItem],
+          suggestions: [intentCuratedItem],
+          alternatives: [],
+          matchedFields: ['intent' as const],
+          decisionReason: 'confident' as const,
+        };
+      }
       const intentAnalysis = analyzeQuery(intent, botConfig.search?.synonymGroups);
       const intentResult = decideSearchResult(rankKnowledge(intentAnalysis, index, options?.intentId));
       if (!intentResult.item && intentResult.suggestions[0]) {

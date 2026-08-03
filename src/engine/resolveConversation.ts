@@ -242,7 +242,7 @@ function knowledgeResolution(
   const rankedSemanticCandidates = semanticCandidates
     .map((item) => ({ item, score: scoreKnowledge(effectiveQuery, item) }))
     .sort((a, b) => b.score - a.score);
-  const hasStrongNewTopic = /(?:온라인|비대면|화상|실명|연락|신청|누가|준비|주말|계획표|피드백|과목|환불|비용)/u.test(analysis.normalized);
+  const hasStrongNewTopic = /(?:온라인|비대면|화상|실명|연락|신청|누가|준비|주말|계획표|피드백|과목|환불|비용|성적|자료|부모|보호자)/u.test(analysis.normalized);
   const semanticSelectedItem = !hasStrongNewTopic && rankedSemanticCandidates[0] && (
     rankedSemanticCandidates[0].score >= 0.2 &&
     rankedSemanticCandidates[0].score - (rankedSemanticCandidates[1]?.score ?? 0) >= 0.02
@@ -400,7 +400,7 @@ function knowledgeResolution(
   }
 
   const isCorrectionQuery = analysis.dialogueActs.some((act) => act === 'correct' || act === 'exclude');
-  const contextualOnlineCoaching = /온라인도\s*(?:되|가능)/u.test(analysis.normalized) &&
+  const contextualOnlineCoaching = /온라인(?:도|으로)?\s*(?:되|가능|할\s*수|받)/u.test(analysis.normalized) &&
     routingContext?.lastKnowledgeIds.some((id) => id.startsWith('fit-'));
   const routingQuery = contextualOnlineCoaching
     ? `${effectiveQuery} 온라인 코칭`
@@ -491,6 +491,13 @@ function isSocialOnlyRemainder(query: string): boolean {
   return compact.length === 0;
 }
 
+function stripDiscoursePreamble(query: string): string {
+  return query.replace(
+    /^(?:짧게\s*여쭤볼게요|제가\s*상황을\s*잘\s*몰라서\s*그런데|학부모\s*입장에서\s*확인하고\s*싶어요|말을\s*바꿔서\s*질문하면|조금\s*다르게\s*여쭤보면|설명\s*잘\s*들었어요|상황을\s*먼저\s*말씀드릴게요|제가\s*묻고\s*싶은\s*건\s*이거예요|솔직히\s*말씀드리면|한\s*번에\s*두\s*가지\s*확인할게요|혹시|확인\s*차원에서|이런\s*요청도\s*가능한지\s*묻는데)[\s,.!?]*/u,
+    '',
+  ).trim();
+}
+
 export function validateSmallTalkConfig(config: SmallTalkConfig): string[] {
   const errors: string[] = [];
   const seen = new Map<string, string>();
@@ -532,7 +539,8 @@ export function resolveConversation(
   }
 
   const rules = normalizedRules(smallTalk);
-  const normalized = normalizeText(query);
+  const rawNormalized = normalizeText(query);
+  const normalized = stripDiscoursePreamble(rawNormalized) || rawNormalized;
   const noiseRule = rules.find((rule) => rule.intentId === 'noise');
   const compact = normalized.replace(/\s/g, '');
   if ((!normalized || query.length > MAX_INPUT_LENGTH || REPEATED_CHARACTER.test(compact)) && noiseRule) {
@@ -542,7 +550,7 @@ export function resolveConversation(
   const guardDecision = options?.variant === 'baseline'
     ? undefined
     : classifyGuardedQuery(query) ?? (
-      options?.context?.lastGuardCategory && isGuardExplanationFollowUp(query)
+      options?.context?.lastGuardCategory && isGuardExplanationFollowUp(normalized)
         ? guardDecisionForCategory(options.context.lastGuardCategory)
         : undefined
     );
@@ -593,8 +601,14 @@ export function resolveConversation(
     if (stripped.matchedRule && isSocialOnlyRemainder(stripped.query)) {
       return smallTalkResolution(query, normalized, stripped.matchedRule, options?.context, analysis);
     }
-    return knowledgeResolution(query, stripped.query, botConfig, options?.intentId, options?.context, options?.variant, analysis);
+    const effective = stripDiscoursePreamble(stripped.query) || stripped.query;
+    const effectiveAnalysis = effective === stripped.query ? analysis : analyzeConversationInput(effective, options?.context);
+    effectiveAnalysis.audience = analysis.audience;
+    return knowledgeResolution(query, effective, botConfig, options?.intentId, options?.context, options?.variant, effectiveAnalysis);
   }
 
-  return knowledgeResolution(query, query, botConfig, options?.intentId, options?.context, options?.variant, analysis);
+  const effective = normalized !== rawNormalized ? normalized : query;
+  const effectiveAnalysis = effective === query ? analysis : analyzeConversationInput(effective, options?.context);
+  effectiveAnalysis.audience = analysis.audience;
+  return knowledgeResolution(query, effective, botConfig, options?.intentId, options?.context, options?.variant, effectiveAnalysis);
 }

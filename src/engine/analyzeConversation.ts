@@ -126,7 +126,7 @@ export function analyzeConversationInput(query: string, context?: ConversationCo
     .filter((segment) => normalizeText(segment).length >= 2);
 
   const dialogueActs = [...new Set(segments.flatMap((segment) => segment.dialogueActs))];
-  if (context && /(?:아니요|아니에요|말한\s*건|물은\s*거|이야기였|정확히는|정확하게는|(?:계획|시험|환불|변경|등록|방문|체험)보다)/u.test(normalized)) {
+  if (context && /(?:아뇨|아니요|아니에요|말한\s*건|물은\s*거|이야기였|정확히는|정확하게는|\S+보다)/u.test(normalized)) {
     dialogueActs.push('correct');
   }
 
