@@ -353,6 +353,27 @@ export interface QueryFeatures {
   followUp: boolean;
 }
 
+export type DialogueFrameStatus = 'pending' | 'clarifying' | 'resolved' | 'excluded';
+
+export interface DialogueFrame {
+  id: string;
+  sourceText: string;
+  candidateKnowledgeIds: string[];
+  resolvedKnowledgeIds: string[];
+  status: DialogueFrameStatus;
+  selectedKnowledgeId?: string;
+  confidence: SearchConfidence;
+  revision: number;
+}
+
+export interface ClarificationState {
+  frameId: string;
+  questionId: string;
+  candidateKnowledgeIds: string[];
+  candidateLabels: string[];
+  selectedIndex?: number;
+}
+
 export interface ConversationContext {
   lastIntentId?: string;
   lastKnowledgeIds: string[];
@@ -368,6 +389,11 @@ export interface ConversationContext {
   lastBotAction?: 'answer' | 'clarify' | 'fallback' | 'handoff' | 'smalltalk';
   frustrationLevel?: number;
   correctionHistory?: Array<{ entity: string; from?: string; to: string }>;
+  /** Structured Phase 5 state; legacy context fields remain for widget compatibility. */
+  dialogueFrames?: DialogueFrame[];
+  pendingClarification?: ClarificationState;
+  stateRevision?: number;
+  lastGuardCategory?: GuardCategory;
 }
 
 export interface ResponsePlan {

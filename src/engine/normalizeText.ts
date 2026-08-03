@@ -6,5 +6,6 @@ export function normalizeText(value: string): string {
     .toLocaleLowerCase('ko-KR')
     .replace(SYMBOLS, ' ')
     .replace(SPACES, ' ')
+    .replace(/요요$/u, '요')
     .trim();
 }

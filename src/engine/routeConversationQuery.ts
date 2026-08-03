@@ -149,13 +149,25 @@ export function routeConversationQuery(
   const standaloneUsable = isUsable(standalone);
   const contextualUsable = isUsable(contextual);
 
+  if (standaloneItem && standalone.score >= 0.97 && standalone.matchedFields.includes('intent')) {
+    return {
+      effectiveQuery: query,
+      result: standalone,
+      decision: decision('standalone', 'standalone-exact', standalone, contextual),
+      continued: false,
+    };
+  }
+
   if (standaloneItem && contextualItem && standaloneItem.id === contextualItem.id && (standaloneUsable || contextualUsable)) {
     const useContextual = features.referenceStrength === 'strong' || contextual.score > standalone.score;
+    const selected = useContextual ? contextual : standalone;
+    const requiresClarification = selected.status === 'suggestions';
     return {
       effectiveQuery: useContextual ? enrichedQuery : query,
-      result: useContextual ? contextual : standalone,
-      decision: decision(features.referenceStrength === 'strong' ? 'contextual' : 'standalone', 'same-candidate', standalone, contextual),
+      result: selected,
+      decision: decision(requiresClarification ? 'clarification' : features.referenceStrength === 'strong' ? 'contextual' : 'standalone', 'same-candidate', standalone, contextual),
       continued: features.referenceStrength === 'strong',
+      clarificationPrompt: requiresClarification ? '어느 내용을 말씀하시는지 한 번만 더 확인해 주세요.' : undefined,
     };
   }
 

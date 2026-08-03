@@ -117,6 +117,7 @@ export function analyzeConversationInput(query: string, context?: ConversationCo
   });
   const knowledgeSegments = segments
     .filter((segment) => !looksLikeRelationshipOnly(normalizeText(segment.text), relationship?.pattern))
+    .filter((segment) => !/^(?:잠깐만요|잠시만요|솔직히\s*말씀드리면)$/u.test(normalizeText(segment.text)))
     .filter((segment) => !/(?:두\s*가지|한\s*번에).*(?:물어|질문|확인)/u.test(normalizeText(segment.text)))
     .filter((segment) => !segment.dialogueActs.every((act) => act !== 'ask' && act !== 'compare' && act !== 'correct'))
     .map((segment) => segment.excluded
@@ -124,12 +125,17 @@ export function analyzeConversationInput(query: string, context?: ConversationCo
       : segment.text)
     .filter((segment) => normalizeText(segment).length >= 2);
 
+  const dialogueActs = [...new Set(segments.flatMap((segment) => segment.dialogueActs))];
+  if (context && /(?:아니요|아니에요|말한\s*건|물은\s*거|이야기였|정확히는|정확하게는|(?:계획|시험|환불|변경|등록|방문|체험)보다)/u.test(normalized)) {
+    dialogueActs.push('correct');
+  }
+
   return {
     normalized,
     audience: audienceOf(normalized, context?.audience),
     segments,
     knowledgeSegments: knowledgeSegments.length ? knowledgeSegments : [query],
-    dialogueActs: [...new Set(segments.flatMap((segment) => segment.dialogueActs))],
+    dialogueActs: [...new Set(dialogueActs)],
     relationshipIntent: relationship?.intentId,
     acknowledgement: relationship?.acknowledgement,
     entities: entitiesOf(normalized),

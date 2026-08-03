@@ -7,6 +7,7 @@ interface AmbiguityRule {
   excludedBy?: RegExp;
   candidateIds: string[];
   prompt: string;
+  explicitContrast?: boolean;
 }
 
 export interface AmbiguousQueryDecision {
@@ -17,7 +18,31 @@ export interface AmbiguousQueryDecision {
 // These rules describe missing subjects, not merely low search scores. Keeping
 // them explicit makes every clarification auditable and prevents a confident
 // answer from being manufactured from a weak lexical match.
+const EXPLICIT_CONTRAST_RULES: AmbiguityRule[] = [
+  { pattern: /시간.*(?:어느|무슨|뜻|횟수인지|답변\s*횟수)/u, candidateIds: ['hours-001', 'program-005', 'consultation-008'], prompt: '상담 가능 시간, 코칭 횟수·주기, 예약 변경 중 어느 시간을 확인하실까요?' },
+  { pattern: /(?:정확히.*)?(?:뭘|무엇을|뭐를)?\s*바꾸|변경.*(?:대상|무엇|뭐)/u, excludedBy: /등록.*코칭.*(?:방식|형태)|상담.*(?:예약|일정)|코치.*(?:변경|바꾸)/u, candidateIds: ['policy-004', 'consultation-008', 'program-008'], prompt: '등록 후 코칭 방식, 상담 예약, 코치 중 무엇을 변경하려는지 알려 주세요.' },
+  { pattern: /처음\s*(?:단계|순서).*(?:상담|코칭)|(?:상담|코칭).*처음\s*(?:단계|순서)/u, candidateIds: ['program-003', 'consultation-004'], prompt: '첫 상담에서 확인하는 내용과 상담 신청 후 절차 중 어느 쪽이 궁금하신가요?' },
+  { pattern: /(?:비대면|온라인).*(?:상담인지|코칭인지|상담.*코칭|코칭.*상담)/u, candidateIds: ['program-007', 'consultation-007'], prompt: '온라인 코칭과 비대면 상담 중 어느 쪽을 말씀하신 건가요?' },
+  { pattern: /(?:별도\s*)?(?:금액|비용).*(?:상담비|전체\s*비용)|(?:상담비|전체\s*비용).*(?:금액|비용)/u, candidateIds: ['policy-001', 'pricing-003'], prompt: '전체 코칭 비용과 별도 상담 비용 중 어느 쪽을 확인하실까요?' },
+  { pattern: /준비.*(?:정보인지|상담\s*내용|무엇인지)|(?:정보|상담\s*내용).*준비/u, candidateIds: ['consultation-003', 'privacy-001'], prompt: '상담 전에 정리할 내용과 채팅에 적을 기본 정보 중 어느 쪽이 궁금하신가요?' },
+  { pattern: /부모.*(?:같이|함께|동반).*(?:첫\s*상담|보호자만|학생과)/u, candidateIds: ['consultation-005', 'consultation-006'], prompt: '보호자만 먼저 상담하는 경우와 학생과 함께 상담하는 경우 중 어느 쪽이 궁금하신가요?' },
+  { pattern: /(?:하나|한\s*개).*(?:한\s*과목|과목\s*뜻|전\s*과목)/u, candidateIds: ['fit-006', 'fit-007', 'program-002'], prompt: '한 과목 코칭, 전 과목 관리, 지원 과목 범위 중 어느 쪽을 확인하실까요?' },
+  { pattern: /(?:직접|방문).*(?:센터\s*방문|상담\s*방식|어디로)/u, excludedBy: /(?:어디로|어디에|위치|주소).*(?:가|찾|있)|센터\s*(?:위치|주소)/u, candidateIds: ['location-001', 'consultation-007'], prompt: '센터 위치와 방문·비대면 상담 방식 중 어느 쪽을 확인하실까요?' },
+  { pattern: /취소.*(?:예약\s*취소|등록\s*취소|환불|뭐)/u, candidateIds: ['consultation-008', 'policy-002', 'policy-005'], prompt: '상담 예약 취소, 등록 후 중단, 환불 기준 중 어느 쪽이 궁금하신가요?' },
+  { pattern: /문의.*(?:사람|신청\s*채널).*(?:어느|뭐|말)/u, candidateIds: ['consultation-001', 'privacy-005'], prompt: '상담 신청 채널과 상담 기록을 확인하는 담당 범위 중 어느 쪽을 말씀하신 건가요?' },
+  { pattern: /결과.*(?:초기\s*확인|학습\s*피드백|진단)/u, candidateIds: ['program-003', 'program-006'], prompt: '첫 상담의 초기 확인 내용과 코칭 후 학습 피드백 중 어느 쪽을 확인하실까요?' },
+  { pattern: /가능.{0,12}(?:기준|정보).{0,12}(?:판단|어떤)|(?:기준|정보).{0,12}(?:가능|적합)/u, candidateIds: ['consultation-002', 'fit-001'], prompt: '학생 적합성 확인과 현재 고민에 맞는 대상 여부 중 어느 쪽을 확인하실까요?' },
+  { pattern: /횟수.*(?:코칭|답변)|(?:코칭|답변).*횟수/u, candidateIds: ['program-005', 'hours-001'], prompt: '코칭 횟수·주기와 상담 문의 가능 시간 중 어느 쪽이 궁금하신가요?' },
+  { pattern: /(?:선생님|코치).*(?:배정|변경).*(?:먼저|어느|뭘)/u, candidateIds: ['program-008', 'program-001'], prompt: '코치 배정·변경과 실제 코칭 진행 방식 중 어느 쪽이 궁금하신가요?' },
+  { pattern: /진단.*(?:첫\s*상담|별도\s*체험|체험)/u, candidateIds: ['program-003', 'pricing-005'], prompt: '첫 상담에서 확인하는 내용과 별도 체험 가능 여부 중 어느 쪽이 궁금하신가요?' },
+  { pattern: /시작\s*시점.*(?:등록\s*확정|상담\s*절차)|(?:등록\s*확정|상담\s*절차).*시작/u, candidateIds: ['policy-003', 'consultation-004'], prompt: '등록 확정 시점과 상담 신청 후 절차 중 어느 쪽이 궁금하신가요?' },
+  { pattern: /(?:그\s*)?정보.*(?:기본\s*정보|성적\s*자료)|(?:기본\s*정보|성적\s*자료).*정보/u, candidateIds: ['privacy-001', 'privacy-002'], prompt: '처음 문의에 적을 기본 정보와 성적표·성적 자료 중 어느 쪽을 말씀하신 건가요?' },
+  { pattern: /비교\s*대상.*(?:학원|과외)|(?:학원인지|과외인지).*(?:비교|대상)/u, candidateIds: ['intro-002', 'intro-003'], prompt: '학원과의 차이와 과외와의 차이 중 어느 쪽을 비교하고 싶으신가요?' },
+  { pattern: /방식.*(?:상담\s*방식|코칭\s*(?:진행\s*)?방식)|(?:상담\s*방식|코칭\s*(?:진행\s*)?방식).*(?:어느|뭐)/u, candidateIds: ['program-001', 'consultation-007'], prompt: '코칭 진행 방식과 방문·비대면 상담 방식 중 어느 쪽이 궁금하신가요?' },
+].map((rule) => ({ ...rule, explicitContrast: true }));
+
 const AMBIGUITY_RULES: AmbiguityRule[] = [
+  ...EXPLICIT_CONTRAST_RULES,
   { pattern: /(?:부모|학부모).*(?:같이|함께|동반).*(?:해야|가야|필요)/u, excludedBy: /(?:상담|코칭|방문)/u, candidateIds: ['consultation-005', 'consultation-006'], prompt: '학부모만 먼저 상담할 수 있는지, 학생과 함께 상담해야 하는지 중 어느 쪽이 궁금하신가요?' },
   { pattern: /(?:취소|그만).*(?:어떻게|방법|절차)/u, excludedBy: /(?:상담|예약|등록|코칭|환불)/u, candidateIds: ['consultation-008', 'policy-002', 'policy-005'], prompt: '상담 예약 취소와 등록·코칭 취소 및 환불 중 어느 쪽이 궁금하신가요?' },
   { pattern: /(?:그건|그거|그\s*부분|그\s*내용).*(?:어떻게|뭐|무엇)/u, candidateIds: ['intro-001', 'program-001'], prompt: '앞선 대화가 없어 어떤 내용을 가리키는지 확인하기 어려워요. 서비스 소개와 코칭 방식 중 어느 쪽이 궁금하신가요?' },
@@ -50,7 +75,13 @@ function candidates(config: BotConfig, ids: string[]): KnowledgeItem[] {
 
 export function detectAmbiguousQuery(query: string, config: BotConfig): AmbiguousQueryDecision | undefined {
   const normalized = normalizeText(query);
-  const rule = AMBIGUITY_RULES.find((entry) => entry.pattern.test(normalized) && !entry.excludedBy?.test(normalized));
+  const requestsAll = /(?:둘\s*다|두\s*가지|한\s*번에|같이|함께|각각).*(?:알려|설명|정리|확인|궁금|구분)|(?:과|와).*(?:알려|설명|정리|비교해|구분해)\s*(?:주세요)?$/u.test(normalized);
+  if (requestsAll) return undefined;
+  const rule = AMBIGUITY_RULES.find((entry) =>
+    entry.pattern.test(normalized) &&
+    !entry.excludedBy?.test(normalized) &&
+    !(entry.explicitContrast && requestsAll),
+  );
   if (!rule) return undefined;
   const suggestions = candidates(config, rule.candidateIds);
   if (suggestions.length < 2) return undefined;

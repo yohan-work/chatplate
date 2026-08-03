@@ -12,11 +12,17 @@ import type {
 } from '../types/chatbot';
 import { analyzeConversationInput, correctionHistory, type ConversationInputAnalysis } from './analyzeConversation';
 import { composeResponsePlan } from './composeResponsePlan';
+import { excludedKnowledgeIds, reduceDialogueState } from './dialogueState';
 import { detectAmbiguousQuery } from './detectAmbiguousQuery';
-import { classifyGuardedQuery } from './detectUnsupportedQuery';
+import {
+  classifyGuardedQuery,
+  guardDecisionForCategory,
+  isGuardExplanationFollowUp,
+} from './detectUnsupportedQuery';
 import { normalizeText } from './normalizeText';
 import { extractQueryFeatures } from './queryFeatures';
 import { routeConversationQuery } from './routeConversationQuery';
+import { scoreKnowledge } from './scoreKnowledge';
 import { findKnowledgeById, searchKnowledge } from './searchKnowledge';
 
 const MAX_INPUT_LENGTH = 300;
@@ -117,7 +123,37 @@ function smallTalkResolution(
       lastBotAction: rule.handoffCta ? 'handoff' : 'smalltalk',
       frustrationLevel,
       correctionHistory: previous?.correctionHistory ?? [],
+      dialogueFrames: previous?.dialogueFrames ?? [],
+      pendingClarification: previous?.pendingClarification,
+      stateRevision: previous?.stateRevision ?? 0,
+      lastGuardCategory: previous?.lastGuardCategory,
     },
+  };
+}
+
+function guardContextPatch(
+  previous: ConversationContext | undefined,
+  analysis: ConversationInputAnalysis,
+  category: NonNullable<ConversationResolution['guardDecision']>['category'],
+): ConversationContext {
+  return {
+    lastIntentId: previous?.lastIntentId,
+    lastKnowledgeIds: previous?.lastKnowledgeIds ?? [],
+    entities: { ...(previous?.entities ?? {}), ...analysis.entities },
+    pendingCandidateIds: [],
+    turnCount: (previous?.turnCount ?? 0) + 1,
+    updatedAt: Date.now(),
+    audience: analysis.audience ?? previous?.audience ?? 'unknown',
+    activeGoal: previous?.activeGoal,
+    openIntentIds: previous?.openIntentIds ?? [],
+    answeredIntentIds: previous?.answeredIntentIds ?? [],
+    lastDialogueAct: analysis.dialogueActs[0],
+    lastBotAction: 'handoff',
+    frustrationLevel: previous?.frustrationLevel ?? 0,
+    correctionHistory: previous?.correctionHistory ?? [],
+    dialogueFrames: previous?.dialogueFrames ?? [],
+    stateRevision: (previous?.stateRevision ?? 0) + 1,
+    lastGuardCategory: category,
   };
 }
 
@@ -132,6 +168,7 @@ function contextPatch(
   const features = extractQueryFeatures(query);
   const entities = { ...features.entities, ...(analysis?.entities ?? {}) };
   const isCorrection = analysis?.dialogueActs.includes('correct') ?? false;
+  const dialogueState = reduceDialogueState(query, result, previous, analysis);
   if (clarification && previous) {
     return {
       ...previous,
@@ -147,6 +184,8 @@ function contextPatch(
         ? Math.min(3, (previous.frustrationLevel ?? 0) + 1)
         : previous.frustrationLevel ?? 0,
       correctionHistory: correctionHistory(previous, entities, isCorrection),
+      ...dialogueState,
+      lastGuardCategory: undefined,
     };
   }
 
@@ -168,6 +207,8 @@ function contextPatch(
       ? Math.min(3, (previous?.frustrationLevel ?? 0) + 1)
       : previous?.frustrationLevel ?? 0,
     correctionHistory: correctionHistory(previous, entities, isCorrection),
+    ...dialogueState,
+    lastGuardCategory: undefined,
   };
 }
 
@@ -192,9 +233,21 @@ function knowledgeResolution(
   const candidateIds = routingContext?.pendingCandidateIds.length
     ? routingContext.pendingCandidateIds
     : routingContext?.lastKnowledgeIds ?? [];
-  const selectedItem = analysis.selectedIndex !== undefined
+  const indexedSelectedItem = analysis.selectedIndex !== undefined
     ? findKnowledgeById(engineConfig, candidateIds[analysis.selectedIndex] ?? '')
     : undefined;
+  const semanticCandidates = routingContext?.pendingCandidateIds
+    .map((id) => findKnowledgeById(engineConfig, id))
+    .filter((item): item is KnowledgeItem => Boolean(item)) ?? [];
+  const rankedSemanticCandidates = semanticCandidates
+    .map((item) => ({ item, score: scoreKnowledge(effectiveQuery, item) }))
+    .sort((a, b) => b.score - a.score);
+  const hasStrongNewTopic = /(?:온라인|비대면|화상|실명|연락|신청|누가|준비|주말|계획표|피드백|과목|환불|비용)/u.test(analysis.normalized);
+  const semanticSelectedItem = !hasStrongNewTopic && rankedSemanticCandidates[0] && (
+    rankedSemanticCandidates[0].score >= 0.2 &&
+    rankedSemanticCandidates[0].score - (rankedSemanticCandidates[1]?.score ?? 0) >= 0.02
+  ) ? rankedSemanticCandidates[0].item : undefined;
+  const selectedItem = indexedSelectedItem ?? semanticSelectedItem;
   const controlStyle = analysis.dialogueActs.includes('shorten')
     ? 'short' as const
     : analysis.dialogueActs.includes('summarize')
@@ -208,6 +261,11 @@ function knowledgeResolution(
   const previousItems = routingContext?.lastKnowledgeIds
     .map((id) => findKnowledgeById(engineConfig, id))
     .filter((item): item is KnowledgeItem => Boolean(item)) ?? [];
+  const correctionAcknowledgement = analysis.dialogueActs.some((act) => act === 'correct' || act === 'exclude')
+    ? '말씀하신 정정 내용을 기준으로 다시 안내할게요.'
+    : analysis.dialogueActs.includes('confirm') && excludedKnowledgeIds(routingContext).length
+      ? '방금 정정하신 내용을 기준으로 이해했어요.'
+      : analysis.acknowledgement;
 
   if (phase4Enabled && (selectedItem || (controlOnly && previousItems.length))) {
     const items = selectedItem ? [selectedItem] : previousItems;
@@ -225,7 +283,7 @@ function knowledgeResolution(
     const responsePlan = composeResponsePlan(effectiveQuery, searchResult, routingContext, {
       continued: true,
       audience: analysis.audience,
-      acknowledgement: analysis.acknowledgement,
+      acknowledgement: correctionAcknowledgement,
       responseStyle: controlStyle,
     });
     return {
@@ -257,7 +315,9 @@ function knowledgeResolution(
     };
   }
 
-  const explicitAmbiguity = phase4Enabled && !routingContext ? detectAmbiguousQuery(effectiveQuery, engineConfig) : undefined;
+  const explicitAmbiguity = phase4Enabled && !routingContext && !analysis.dialogueActs.includes('select')
+    ? detectAmbiguousQuery(effectiveQuery, engineConfig)
+    : undefined;
   if (explicitAmbiguity) {
     const searchResult = explicitAmbiguity.result;
     return {
@@ -273,7 +333,9 @@ function knowledgeResolution(
         standaloneKnowledgeId: searchResult.suggestions[0]?.id,
         standaloneScore: searchResult.score,
       },
-      clarificationPrompt: explicitAmbiguity.prompt,
+      clarificationPrompt: correctionAcknowledgement
+        ? `${correctionAcknowledgement} ${explicitAmbiguity.prompt}`
+        : explicitAmbiguity.prompt,
       segments: analysis.segments,
       resolvedIntents: [],
       unresolvedSegments: [effectiveQuery],
@@ -306,7 +368,7 @@ function knowledgeResolution(
       };
       const responsePlan = composeResponsePlan(effectiveQuery, searchResult, routingContext, {
         audience: analysis.audience,
-        acknowledgement: analysis.acknowledgement,
+        acknowledgement: correctionAcknowledgement,
         unresolvedSegments,
       });
       return {
@@ -337,14 +399,40 @@ function knowledgeResolution(
     }
   }
 
-  const route = routeConversationQuery(effectiveQuery, engineConfig, { intentId, context: routingContext, variant });
-  const searchResult = route.result;
+  const isCorrectionQuery = analysis.dialogueActs.some((act) => act === 'correct' || act === 'exclude');
+  const contextualOnlineCoaching = /온라인도\s*(?:되|가능)/u.test(analysis.normalized) &&
+    routingContext?.lastKnowledgeIds.some((id) => id.startsWith('fit-'));
+  const routingQuery = contextualOnlineCoaching
+    ? `${effectiveQuery} 온라인 코칭`
+    : isCorrectionQuery && analysis.knowledgeSegments.length === 1
+    ? analysis.knowledgeSegments[0]
+    : effectiveQuery;
+  const route = routeConversationQuery(routingQuery, engineConfig, { intentId, context: routingContext, variant });
+  const excludedIds = new Set([
+    ...excludedKnowledgeIds(routingContext),
+    ...(isCorrectionQuery ? routingContext?.lastKnowledgeIds ?? [] : []),
+  ]);
+  const shouldFilterExcluded = route.decision.reason !== 'standalone-exact' && excludedIds.size > 0;
+  const filteredItems = shouldFilterExcluded
+    ? (route.result.items ?? (route.result.item ? [route.result.item] : [])).filter((item) => !excludedIds.has(item.id))
+    : route.result.items ?? (route.result.item ? [route.result.item] : []);
+  const filteredSuggestions = shouldFilterExcluded
+    ? route.result.suggestions.filter((item) => !excludedIds.has(item.id))
+    : route.result.suggestions;
+  const searchResult: SearchResult = shouldFilterExcluded ? {
+    ...route.result,
+    item: filteredItems[0],
+    items: filteredItems,
+    suggestions: filteredSuggestions,
+    alternatives: route.result.alternatives.filter((item) => !excludedIds.has(item.id)),
+    status: filteredItems.length || filteredSuggestions.length ? route.result.status : 'fallback',
+  } : route.result;
   const responsePlan = route.decision.mode === 'clarification'
     ? undefined
     : composeResponsePlan(effectiveQuery, searchResult, routingContext, phase4Enabled ? {
       continued: route.continued,
       audience: analysis.audience,
-      acknowledgement: analysis.acknowledgement,
+      acknowledgement: correctionAcknowledgement,
       responseStyle: controlStyle,
     } : { continued: route.continued });
   const resolvedItems = searchResult.items ?? (searchResult.item ? [searchResult.item] : []);
@@ -357,7 +445,9 @@ function knowledgeResolution(
     answerTrust: responsePlan?.answerTrust,
     contextPatch: contextPatch(effectiveQuery, searchResult, previous, route.decision.mode === 'clarification', analysis),
     routeDecision: route.decision,
-    clarificationPrompt: route.clarificationPrompt,
+    clarificationPrompt: correctionAcknowledgement && route.decision.mode === 'clarification'
+      ? `${correctionAcknowledgement} ${route.clarificationPrompt ?? '어느 내용을 말씀하시는지 확인해 주세요.'}`
+      : route.clarificationPrompt,
     segments: analysis.segments,
     resolvedIntents: resolvedItems.map((item) => ({
       segment: effectiveQuery,
@@ -394,6 +484,11 @@ function stripSocialWrappers(query: string, rules: NormalizedRule[]): { query: s
   }
 
   return { query: remaining, matchedRule };
+}
+
+function isSocialOnlyRemainder(query: string): boolean {
+  const compact = query.replace(/(?:네|예|알겠어요|알겠습니다|이해했어요|설명|일단|여기까지|볼게요|그럴게요|좋아요)/gu, '').trim();
+  return compact.length === 0;
 }
 
 export function validateSmallTalkConfig(config: SmallTalkConfig): string[] {
@@ -444,7 +539,13 @@ export function resolveConversation(
     return smallTalkResolution(query, normalized, noiseRule, options?.context, analysis);
   }
 
-  const guardDecision = options?.variant === 'baseline' ? undefined : classifyGuardedQuery(query);
+  const guardDecision = options?.variant === 'baseline'
+    ? undefined
+    : classifyGuardedQuery(query) ?? (
+      options?.context?.lastGuardCategory && isGuardExplanationFollowUp(query)
+        ? guardDecisionForCategory(options.context.lastGuardCategory)
+        : undefined
+    );
   if (guardDecision) {
     return {
       kind: 'fallback',
@@ -471,6 +572,7 @@ export function resolveConversation(
       segments: analysis.segments,
       unresolvedSegments: [query],
       dialogueActs: analysis.dialogueActs,
+      contextPatch: guardContextPatch(options?.context, analysis, guardDecision.category),
     };
   }
 
@@ -488,6 +590,9 @@ export function resolveConversation(
   const stripped = stripSocialWrappers(normalized, rules);
   if (stripped.query !== normalized) {
     if (!stripped.query && stripped.matchedRule) return smallTalkResolution(query, normalized, stripped.matchedRule, options?.context, analysis);
+    if (stripped.matchedRule && isSocialOnlyRemainder(stripped.query)) {
+      return smallTalkResolution(query, normalized, stripped.matchedRule, options?.context, analysis);
+    }
     return knowledgeResolution(query, stripped.query, botConfig, options?.intentId, options?.context, options?.variant, analysis);
   }
 
