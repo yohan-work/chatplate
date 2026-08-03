@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview --host 0.0.0.0",
     "qa:conversation": "vite-node src/qa/runConversationQa.ts",
+    "qa:conversation:audit": "vite-node src/qa/runConversationAudit.ts",
     "test": "vitest run"
   },
   "dependencies": {
