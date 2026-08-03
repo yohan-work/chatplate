@@ -1,4 +1,5 @@
 import type { ConversationContext, KnowledgeItem, ResponsePlan, SearchResult } from '../types/chatbot';
+import { combinedAnswerTrust } from './answerTrust';
 import { extractQueryFeatures } from './queryFeatures';
 
 const OPENINGS = [
@@ -29,9 +30,12 @@ export function composeResponsePlan(
   if (!items.length) return undefined;
 
   const variant = stableHash(`${query}:${items.map((item) => item.id).join(':')}:${context?.turnCount ?? 0}`) % OPENINGS.length;
+  const answerTrust = combinedAnswerTrust(items);
   const features = extractQueryFeatures(query);
   const contextOpening = context && context.turnCount > 0 && options?.continued
     ? '앞선 문의와 이어서 안내드리면,'
+    : answerTrust === 'bounded'
+      ? '현재 등록된 안내 범위에서 말씀드리면,'
     : items.length > 1
       ? '질문하신 내용을 두 가지로 나누어 안내드릴게요.'
       : OPENINGS[variant];
@@ -53,5 +57,6 @@ export function composeResponsePlan(
     knowledgeIds: items.map((item) => item.id),
     toneVariant: variant,
     followUpPrompts,
+    answerTrust,
   };
 }

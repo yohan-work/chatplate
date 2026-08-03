@@ -3,23 +3,30 @@ import type { KnowledgeItem } from '../types/chatbot';
 const SOURCE = '대표 승인 FAQ 패킷 대기';
 const UPDATED = '2026-07-28';
 
-function safeAnswer(intentId: string): string {
-  if (intentId === 'pricing' || intentId === 'policy') {
-    return '비용과 등록 조건은 프로그램과 상담 내용에 따라 달라질 수 있어 이곳에서 확정 금액이나 가능 여부를 안내하지 않습니다. 최신 기준은 카카오 상담 채널에서 확인해 주세요.';
-  }
-  if (intentId === 'privacy') {
-    return '학년과 학습 고민 정도만 먼저 알려 주세요. 주민등록번호, 계정 비밀번호, 상세 성적표, 건강·심리 정보 등 민감한 개인정보는 챗봇에 입력하지 마세요.';
-  }
-  if (intentId === 'fit') {
-    return '학생마다 현재 학습 상태와 목표가 달라 이 질문만으로 적합 여부를 단정하기는 어렵습니다. 현재 가장 큰 고민이 계획, 습관, 과목, 동기 중 어느 쪽인지 알려 주시면 관련 안내를 찾아드릴게요.';
-  }
-  if (intentId === 'program') {
-    return '코칭 방식은 학생의 목표와 현재 상태에 따라 달라질 수 있습니다. 구체적인 진행 방식과 가능한 범위는 카카오 상담에서 확인해 주세요.';
-  }
-  if (intentId === 'consultation') {
-    return '상담 방법과 가능한 일정은 운영 상황에 따라 달라질 수 있습니다. 카카오 상담 채널에 학생의 학년과 궁금한 내용을 간단히 남겨 주세요.';
-  }
-  return '코치 마이:웨이의 학습 코칭은 학생의 상황을 먼저 확인한 뒤 안내합니다. 구체적인 차이와 적합성은 카카오 상담에서 확인해 주세요.';
+const FOLLOW_UP_BY_INTENT: Record<string, string> = {
+  intro: '비교하려는 서비스와 가장 중요하게 보는 기준을 알려 주세요.',
+  fit: '학생의 학년과 현재 가장 큰 학습 고민을 알려 주세요.',
+  program: '학생의 학년과 원하는 과목·진행 방식을 알려 주세요.',
+  consultation: '학생의 학년과 상담에서 확인하고 싶은 내용을 알려 주세요.',
+  pricing: '관심 있는 프로그램과 확인하려는 비용 항목을 알려 주세요.',
+  policy: '신청한 프로그램과 변경·취소하려는 시점을 알려 주세요.',
+  privacy: '민감한 원문은 보내지 말고, 어떤 종류의 정보인지만 알려 주세요.',
+};
+
+function boundedAnswer(intentId: string, question: string): string {
+  const subject = question.replace(/[?？.]$/u, '');
+  const limitation = intentId === 'pricing' || intentId === 'policy'
+    ? '금액·등록 조건은 승인된 최신 기준을 확인해야 하므로 여기서 확정할 수 없어요.'
+    : intentId === 'privacy'
+      ? '개인정보 처리 범위는 승인된 기준만 안내할 수 있고, 민감한 정보는 채팅에 입력하면 안 돼요.'
+      : intentId === 'fit'
+        ? '학생마다 상태와 목표가 달라 현재 질문만으로 적합 여부를 단정할 수 없어요.'
+        : intentId === 'program'
+          ? '구체적인 코칭 운영 방식은 학생 상황과 승인된 운영 기준을 확인해야 해요.'
+          : intentId === 'consultation'
+            ? '상담 가능 범위와 절차는 현재 운영 기준을 확인해야 해요.'
+            : '서비스 간 차이는 승인된 비교 기준과 학생의 우선순위를 함께 확인해야 해요.';
+  return `“${subject}”에 대해서는 아직 승인된 세부 답변이 등록되어 있지 않아요. ${limitation} ${FOLLOW_UP_BY_INTENT[intentId] ?? '궁금한 범위를 조금 더 구체적으로 알려 주세요.'}`;
 }
 
 function draft(
@@ -40,7 +47,7 @@ function draft(
     aliases,
     keywords,
     negativeKeywords,
-    answer: safeAnswer(intentId),
+    answer: boundedAnswer(intentId, question),
     buttons: [],
     relatedIds,
     priority: 7,
@@ -48,6 +55,7 @@ function draft(
     source: SOURCE,
     lastUpdated: UPDATED,
     handoffRecommended: true,
+    followUpPrompts: [FOLLOW_UP_BY_INTENT[intentId] ?? '궁금한 범위를 조금 더 구체적으로 알려 주세요.'],
   };
 }
 

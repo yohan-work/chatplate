@@ -30,6 +30,18 @@ describe('composeResponsePlan', () => {
     expect(first?.followUpPrompts).toContain('상담 방법도 알려드릴까요?');
   });
 
+  it('separates pending answer trust from retrieval confidence', () => {
+    const pending = {
+      ...item,
+      approvalStatus: 'pending' as const,
+      answerMode: 'safe-general' as const,
+      riskLevel: 'personal' as const,
+    };
+    const plan = composeResponsePlan('중학생도 되나요', { ...result, item: pending, items: [pending] });
+    expect(plan?.answerTrust).toBe('bounded');
+    expect(plan?.text).toContain('현재 등록된 안내 범위');
+  });
+
   it('uses a contextual opening for a follow-up turn', () => {
     const plan = composeResponsePlan(
       '그럼 중학생은요?',

@@ -74,6 +74,9 @@ export function enrichCoachMywayKnowledge(item: KnowledgeItem): KnowledgeItem {
     utterances: buildCoachMywayUtterances(item),
     answerMode: item.answerMode ?? (riskLevel === 'low' ? 'verified' : riskLevel === 'policy' ? 'handoff' : 'safe-general'),
     riskLevel: item.riskLevel ?? riskLevel,
+    approvalStatus: item.approvalStatus ?? (
+      item.source?.startsWith('http') || item.source === '개인정보 최소 수집 운영 원칙' ? 'verified' : 'pending'
+    ),
   };
 }
 

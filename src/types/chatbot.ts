@@ -128,6 +128,24 @@ export type UtterancePersona = 'parent' | 'student' | 'neutral';
 export type UtteranceVariation = 'formal' | 'colloquial' | 'short' | 'synonym' | 'word-order' | 'spacing' | 'typo' | 'contextual';
 export type AnswerMode = 'verified' | 'safe-general' | 'handoff';
 export type KnowledgeRisk = 'low' | 'policy' | 'personal';
+export type KnowledgeApprovalStatus = 'verified' | 'pending' | 'unknown';
+export type AnswerTrust = 'verified' | 'bounded' | 'unverified';
+export type GuardCategory =
+  | 'third-party-data'
+  | 'sensitive-data'
+  | 'private-contact'
+  | 'medical-diagnosis'
+  | 'guarantee'
+  | 'legal-judgment'
+  | 'prompt-injection'
+  | 'open-domain'
+  | 'task-substitution';
+
+export interface GuardDecision {
+  category: GuardCategory;
+  replyText: string;
+  handoffCta: boolean;
+}
 
 export interface SearchUtterance {
   text: string;
@@ -158,6 +176,7 @@ export interface KnowledgeItem {
   utterances?: SearchUtterance[];
   answerMode?: AnswerMode;
   riskLevel?: KnowledgeRisk;
+  approvalStatus?: KnowledgeApprovalStatus;
   tags?: string[];
   negativeKeywords?: string[];
   answer: string;
@@ -201,6 +220,7 @@ export interface ChatMessage {
   suggestions?: KnowledgeItem[];
   relatedQuestions?: KnowledgeItem[];
   confidence?: SearchConfidence;
+  answerTrust?: AnswerTrust;
   matchedKnowledgeIds?: string[];
   feedback?: 'helpful' | 'not-helpful';
   handoffCta?: boolean;
@@ -262,6 +282,7 @@ export interface ResponsePlan {
   knowledgeIds: string[];
   toneVariant: number;
   followUpPrompts: string[];
+  answerTrust?: AnswerTrust;
 }
 
 export type ConversationRouteMode = 'standalone' | 'contextual' | 'clarification' | 'fallback';
@@ -277,6 +298,9 @@ export interface ConversationRouteDecision {
     | 'score-gap'
     | 'close-candidates'
     | 'reference-without-evidence'
+    | 'standalone-ambiguity'
+    | 'pending-selection'
+    | 'guarded'
     | 'both-low';
   standaloneKnowledgeId?: string;
   contextualKnowledgeId?: string;
@@ -296,7 +320,7 @@ export interface SearchResult {
   debugScore?: SearchScoreBreakdown;
   matchedUtterance?: string;
   scoreMargin?: number;
-  decisionReason?: 'exact' | 'confident' | 'ambiguous' | 'low-similarity';
+  decisionReason?: 'exact' | 'confident' | 'ambiguous' | 'guarded' | 'low-similarity';
 }
 
 export interface ConversationResolution {
@@ -308,6 +332,8 @@ export interface ConversationResolution {
   replyText?: string;
   handoffCta?: boolean;
   showSuggestions?: boolean;
+  answerTrust?: AnswerTrust;
+  guardDecision?: GuardDecision;
   responsePlan?: ResponsePlan;
   contextPatch?: ConversationContext;
   routeDecision?: ConversationRouteDecision;
@@ -323,6 +349,8 @@ export interface ConversationEvent {
   interactionType?: ConversationResolution['kind'];
   effectiveQuery?: string;
   smallTalkIntent?: SmallTalkIntentId;
+  answerTrust?: AnswerTrust;
+  guardCategory?: GuardCategory;
   matchedKnowledgeIds: string[];
   candidateKnowledgeIds?: string[];
   topScore?: number;
@@ -424,6 +452,7 @@ export interface SupportMessageMetadata {
   relatedKnowledgeIds?: string[];
   clarificationOptions?: ClarificationOption[];
   handoffCta?: boolean;
+  answerTrust?: AnswerTrust;
   feedback?: ChatMessage['feedback'];
 }
 
