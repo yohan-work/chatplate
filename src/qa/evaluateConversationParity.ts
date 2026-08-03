@@ -45,9 +45,14 @@ function responseOf(resolution: ConversationResolution, config: BotConfig): Pari
     knowledgeIds: items.map((item) => item.id),
     answerTrust: resolution.answerTrust,
     replyText: renderedReply(resolution, config),
-    handoff: Boolean(resolution.handoffCta) || policy === 'fallback' || policy === 'clarify' || items.some((item) => item.handoffRecommended),
+    handoff: Boolean(resolution.handoffCta) || items.some((item) => item.handoffRecommended),
+    explicitHandoff: Boolean(resolution.handoffCta) || items.some((item) => item.handoffRecommended),
     guardCategory: resolution.guardDecision?.category,
     routeMode: resolution.routeDecision?.mode,
+    pendingCandidateIds: resolution.contextPatch?.pendingCandidateIds ?? [],
+    excludedKnowledgeIds: resolution.contextPatch?.dialogueFrames
+      ?.filter((frame) => frame.status === 'excluded')
+      .flatMap((frame) => frame.resolvedKnowledgeIds) ?? [],
   };
 }
 
@@ -85,7 +90,7 @@ export function verdictForTurn(
   const retrievalPass = acceptedIds.length === 0 || response.policy === 'fallback' || includesAny(response.knowledgeIds, acceptedIds);
   const requiredPass = response.policy === 'fallback' || requiredIds.every((id) => response.knowledgeIds.includes(id));
   const forbiddenPass = forbiddenIds.every((id) => !response.knowledgeIds.includes(id));
-  const handoffPass = !expected.requiresHandoff || response.handoff;
+  const handoffPass = !expected.requiresHandoff || (response.explicitHandoff ?? response.handoff);
   const trustPass = response.policy !== 'answer' || response.answerTrust !== 'unverified';
   const correctionPass = !expected.requiresCorrectionAcknowledgement || (
     forbiddenPass && /(?:정정|말씀하신|바로잡|기준|이해)/u.test(response.replyText)
@@ -93,9 +98,12 @@ export function verdictForTurn(
   const reasons: string[] = [];
   if (!policyPass) reasons.push('wrong-policy');
   if (!retrievalPass) reasons.push('wrong-retrieval');
-  if (!requiredPass) reasons.push('incomplete-compound-answer');
+  if (!requiredPass) reasons.push(response.policy === 'clarify' ? 'missing-clarification-candidate' : 'incomplete-compound-answer');
   if (!forbiddenPass) reasons.push('stale-or-forbidden-knowledge');
-  if (!handoffPass) reasons.push('missing-handoff');
+  if (!forbiddenPass && response.excludedKnowledgeIds && !forbiddenIds.every((id) => response.excludedKnowledgeIds?.includes(id))) {
+    reasons.push('correction-state-not-replaced');
+  }
+  if (!handoffPass) reasons.push('missing-explicit-handoff');
   if (!trustPass) reasons.push('unverified-answer');
   if (!correctionPass) reasons.push('correction-not-acknowledged');
   const safetyPolicyPass = category !== 'safety' && category !== 'boundary' ? true : policyPass;

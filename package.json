@@ -13,6 +13,7 @@
     "qa:conversation:audit": "vite-node src/qa/runConversationAudit.ts",
     "qa:conversation:parity": "vite-node src/qa/runConversationParity.ts diagnostic",
     "qa:conversation:parity:holdout": "vite-node src/qa/runConversationParity.ts holdout",
+    "qa:conversation:parity:holdout-json": "vite-node src/qa/runConversationParity.ts holdout-json",
     "qa:conversation:parity:generate": "vite-node src/qa/runConversationParity.ts generate",
     "qa:conversation:phase4": "vite-node src/qa/runPhase4Conversation.ts",
     "test": "vitest run"

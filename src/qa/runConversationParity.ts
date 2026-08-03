@@ -67,12 +67,18 @@ async function deterministicTraces(scenarios = coachMywayParityScenarios): Promi
 
 async function run(): Promise<void> {
   validateCorpus();
-  if (command === 'diagnostic' || command === 'holdout' || command === 'all') {
-    const scenarios = command === 'all'
+  if (command === 'diagnostic' || command === 'holdout' || command === 'all' || command === 'diagnostic-json' || command === 'holdout-json') {
+    const split = command.replace('-json', '');
+    const scenarios = split === 'all'
       ? coachMywayParityScenarios
-      : coachMywayParityScenarios.filter((entry) => entry.split === command);
+      : coachMywayParityScenarios.filter((entry) => entry.split === split);
     const traces = await deterministicTraces(scenarios);
-    console.log(renderConversationParityMarkdown(createConversationParityReport(traces)));
+    const report = createConversationParityReport(traces);
+    if (command.endsWith('-json')) {
+      await writeJson(process.argv[3] ?? `.parity/${split}-report.json`, { report, traces });
+    } else {
+      console.log(renderConversationParityMarkdown(report));
+    }
     return;
   }
 

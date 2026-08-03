@@ -1,10 +1,20 @@
 import type { BlindReviewSummary } from './conversationParityReview';
-import type { ParityTrace } from './conversationParityTypes';
+import type { ParityCategory, ParityTrace } from './conversationParityTypes';
 import { summarizeParityTraces, type ParityMetricSummary } from './evaluateConversationParity';
 
 export interface ConversationParityReport {
   summaries: ParityMetricSummary[];
-  failures: Array<{ engine: string; scenarioId: string; turnId: string; query: string; reasons: string[] }>;
+  failures: Array<{
+    engine: string;
+    category: ParityCategory;
+    scenarioId: string;
+    turnId: string;
+    query: string;
+    policy: string;
+    knowledgeIds: string[];
+    reasons: string[];
+  }>;
+  failureCounts: Record<string, number>;
   blind?: BlindReviewSummary;
   verdict: 'llm-equivalent' | 'partially-equivalent' | 'below-target' | 'insufficient-evidence';
   reasons: string[];
@@ -22,12 +32,19 @@ export function createConversationParityReport(
       .filter((turn) => turn.verdict.reasons.length)
       .map((turn) => ({
         engine: trace.engine,
+        category: trace.category,
         scenarioId: trace.scenarioId,
         turnId: turn.turn.id,
         query: turn.turn.query,
+        policy: turn.response.policy,
+        knowledgeIds: turn.response.knowledgeIds,
         reasons: turn.verdict.reasons,
       })))
-    .slice(0, 20));
+    .slice(0, 40));
+  const failureCounts = traces
+    .filter((trace) => trace.engine === 'candidate')
+    .flatMap((trace) => trace.turns.flatMap((turn) => turn.verdict.reasons.map((reason) => `${trace.category}:${reason}`)))
+    .reduce<Record<string, number>>((counts, key) => ({ ...counts, [key]: (counts[key] ?? 0) + 1 }), {});
   const candidate = summaries.find((summary) => summary.engine === 'candidate');
   const llm = summaries.find((summary) => summary.engine === 'llm');
   const reasons: string[] = [];
@@ -52,7 +69,7 @@ export function createConversationParityReport(
         ? 'partially-equivalent'
         : 'below-target';
   }
-  return { summaries, failures, blind, verdict, reasons };
+  return { summaries, failures, failureCounts, blind, verdict, reasons };
 }
 
 export function renderConversationParityMarkdown(report: ConversationParityReport): string {
@@ -77,6 +94,12 @@ export function renderConversationParityMarkdown(report: ConversationParityRepor
     ...report.summaries.map((summary) => `| ${summary.engine} | ${[
       'paraphrase', 'ambiguity', 'context-correction', 'compound', 'emotion', 'safety', 'boundary',
     ].map((category) => `${(summary.byCategory[category as keyof typeof summary.byCategory].resolutionRate * 100).toFixed(1)}%`).join(' | ')} |`),
+    '',
+    '## Candidate 실패 분해',
+    '',
+    '| Category / reason | Count |',
+    '| --- | ---: |',
+    ...Object.entries(report.failureCounts).sort(([, a], [, b]) => b - a).map(([key, count]) => `| ${key} | ${count} |`),
   ];
   if (report.blind) {
     lines.push(
@@ -95,10 +118,10 @@ export function renderConversationParityMarkdown(report: ConversationParityRepor
     '',
     '## 대표 실패 trace',
     '',
-    '| Engine | Scenario | Turn | Query | Reasons |',
-    '| --- | --- | --- | --- | --- |',
+    '| Engine | Category | Scenario | Turn | Query | Policy / knowledge | Reasons |',
+    '| --- | --- | --- | --- | --- | --- | --- |',
     ...report.failures.map((failure) =>
-      `| ${failure.engine} | ${failure.scenarioId} | ${failure.turnId} | ${failure.query.replace(/\|/gu, '\\|')} | ${failure.reasons.join(', ')} |`,
+      `| ${failure.engine} | ${failure.category} | ${failure.scenarioId} | ${failure.turnId} | ${failure.query.replace(/\|/gu, '\\|')} | ${failure.policy}: ${failure.knowledgeIds.join(', ')} | ${failure.reasons.join(', ')} |`,
     ),
   );
   return `${lines.join('\n')}\n`;

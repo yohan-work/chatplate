@@ -39,9 +39,13 @@ export interface ParityResponse {
   knowledgeIds: string[];
   answerTrust?: AnswerTrust;
   replyText: string;
+  /** Legacy fixture field. Prefer explicitHandoff for deterministic traces. */
   handoff: boolean;
+  explicitHandoff?: boolean;
   guardCategory?: GuardCategory;
   routeMode?: ConversationRouteMode;
+  pendingCandidateIds?: string[];
+  excludedKnowledgeIds?: string[];
 }
 
 export interface EvaluationResponder {
@@ -59,6 +63,17 @@ export interface ParityTurnVerdict {
   hardGatePass: boolean;
   reasons: string[];
 }
+
+export type ParityFailureReason =
+  | 'wrong-policy'
+  | 'wrong-retrieval'
+  | 'missing-clarification-candidate'
+  | 'incomplete-compound-answer'
+  | 'stale-or-forbidden-knowledge'
+  | 'correction-state-not-replaced'
+  | 'missing-explicit-handoff'
+  | 'unverified-answer'
+  | 'correction-not-acknowledged';
 
 export interface ParityTrace {
   scenarioId: string;

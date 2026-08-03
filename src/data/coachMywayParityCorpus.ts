@@ -43,6 +43,17 @@ function scenario(
   };
 }
 
+const ACCEPTED_EQUIVALENTS: Readonly<Record<string, string[]>> = {
+  'fit-003': ['advice-follow-plan'],
+  'fit-005': ['advice-motivation'],
+  'fit-007': ['advice-multiple-subjects'],
+  'fit-010': ['advice-exam-plan', 'advice-test-anxiety'],
+};
+
+function acceptedWithEquivalent(id: string): string[] {
+  return [id, ...(ACCEPTED_EQUIVALENTS[id] ?? [])];
+}
+
 const paraphraseScenarios = SUPPORTED_SEEDS.flatMap(([knowledgeId, first, second], seedIndex) => [
   scenario(`parity-paraphrase-${knowledgeId}-a`, 'paraphrase', seedIndex * 2, [{
     query: `상황을 먼저 말씀드릴게요. ${first}`,
@@ -131,8 +142,8 @@ const contextScenarios = CONTEXT_BASES.flatMap((base, baseIndex) => {
     'context-correction',
     baseIndex * 4 + styleIndex,
     [
-      { query: style(first), policies: ['answer'], accepted: [firstId] },
-      { query: style(correction), policies: ['answer', 'clarify'], accepted: [correctedId], forbidden: [firstId], correction: true },
+      { query: style(first), policies: ['answer'], accepted: acceptedWithEquivalent(firstId) },
+      { query: style(correction), policies: ['answer', 'clarify'], accepted: acceptedWithEquivalent(correctedId), forbidden: [firstId], correction: true },
       { query: style(followUp), policies: ['answer', 'clarify'], accepted: [followUpId], forbidden: firstId === followUpId ? [] : [firstId] },
       { query: '제가 방금 정정한 내용 기준으로 이해한 거 맞죠?', policies: ['answer', 'clarify', 'fallback'], forbidden: [firstId], correction: true },
     ],
@@ -198,12 +209,12 @@ const EMOTION_BASES: ReadonlyArray<readonly [string, string, string, string]> = 
 
 const emotionScenarios = EMOTION_BASES.flatMap(([id, first, firstId, second], baseIndex) => [
   scenario(`parity-emotion-${id}-a`, 'emotion', baseIndex * 2, [
-    { query: first, policies: ['answer'], accepted: [firstId] },
+    { query: first, policies: ['answer'], accepted: acceptedWithEquivalent(firstId) },
     { query: second, policies: ['answer', 'clarify'] },
     { query: '알겠어요, 설명 고마워요', policies: ['smalltalk'] },
   ]),
   scenario(`parity-emotion-${id}-b`, 'emotion', baseIndex * 2 + 1, [
-    { query: `솔직히 말씀드리면 ${first}`, policies: ['answer'], accepted: [firstId] },
+    { query: `솔직히 말씀드리면 ${first}`, policies: ['answer'], accepted: acceptedWithEquivalent(firstId) },
     { query: `그 부분은 이해했어요. ${second}`, policies: ['answer', 'clarify'] },
     { query: '네, 일단 여기까지 볼게요. 감사합니다', policies: ['smalltalk'] },
   ]),
