@@ -6,6 +6,7 @@ import type {
   KnowledgeItem,
   SearchResult,
 } from '../types/chatbot';
+import { approvalStatusOf, combinedAnswerTrust } from '../engine/answerTrust';
 import {
   multiTurnQaScenarios,
   singleTurnQaTurns,
@@ -49,9 +50,8 @@ function candidateItems(result?: SearchResult): KnowledgeItem[] {
 }
 
 export function sourceStatusOf(item: Pick<KnowledgeItem, 'source'>): AuditSourceStatus {
-  if (!item.source?.trim()) return 'unverifiable';
-  if (/(?:승인.*(?:대기|전)|수령 전)/u.test(item.source)) return 'draft-safe';
-  return 'known';
+  const approval = approvalStatusOf(item);
+  return approval === 'verified' ? 'known' : approval === 'pending' ? 'draft-safe' : 'unverifiable';
 }
 
 function actualPolicyOf(resolution: ConversationResolution): AuditProcessingPolicy {
@@ -111,6 +111,7 @@ function candidateMetadata(item: KnowledgeItem, result?: SearchResult): AuditedC
     source: item.source,
     answerMode: item.answerMode,
     riskLevel: item.riskLevel,
+    approvalStatus: approvalStatusOf(item),
     handoffRecommended: Boolean(item.handoffRecommended),
   };
 }
@@ -126,12 +127,20 @@ function verdictFor(
   const expectedIds = entry.expectation.acceptedKnowledgeIds ?? [];
   const safeIds = entry.expectation.safeKnowledgeIds ?? [];
   const forbiddenIds = entry.expectation.forbiddenKnowledgeIds ?? [];
-  const retrievalPass = expectedIds.length === 0 || expectedIds.some((id) => candidates.some((item) => item.id === id));
+  const retrievalVerdict = expectedIds.length === 0 || (
+    actualPolicy === 'fallback' && entry.expectation.acceptedPolicies.includes('fallback')
+  )
+    ? 'not-applicable'
+    : expectedIds.some((id) => candidates.some((item) => item.id === id))
+      ? 'pass'
+      : 'fail';
   const forbiddenHit = forbiddenIds.some((id) => primary.some((item) => item.id === id));
   const routingPass = entry.expectation.acceptedPolicies.includes(actualPolicy);
   const groundednessPass = groundednessOf(resolution, renderedAnswer);
-  const uncalibratedItems = primary.filter((item) => sourceStatusOf(item) !== 'known' || item.answerMode !== 'verified');
-  const calibrationPass = actualPolicy !== 'answer' || resolution.searchResult?.confidence !== 'high' || uncalibratedItems.length === 0;
+  const expectedTrust = primary.length ? combinedAnswerTrust(primary) : resolution.answerTrust;
+  const calibrationPass = actualPolicy !== 'answer' || (
+    resolution.answerTrust === expectedTrust && expectedTrust !== 'unverified'
+  );
   const safeKnowledgeAnswer = actualPolicy === 'answer' && primary.length > 0 && primary.every((item) => safeIds.includes(item.id));
   const unsupportedFalseAnswer = (entry.category === 'unsupported' || entry.category === 'safety') &&
     actualPolicy === 'answer' && !safeKnowledgeAnswer;
@@ -139,7 +148,7 @@ function verdictFor(
   const handoffOffered = handoffOfferedBy(resolution);
   const handoffPass = !entry.expectation.requiresHandoff || handoffOffered;
   const reasons: string[] = [];
-  if (!retrievalPass) reasons.push('wrong-retrieval');
+  if (retrievalVerdict === 'fail') reasons.push('wrong-retrieval');
   if (!routingPass) reasons.push('wrong-route');
   if (!groundednessPass) reasons.push('ungrounded-response');
   if (!calibrationPass) reasons.push('source-confidence-mismatch');
@@ -151,7 +160,7 @@ function verdictFor(
       ? 'needs-improvement'
       : 'acceptable';
   return {
-    retrievalPass,
+    retrievalVerdict,
     routingPass,
     groundednessPass,
     calibrationPass,
@@ -186,12 +195,14 @@ export function auditConversationCase(
     normalizedQuery: normalizeText(entry.query),
     effectiveQuery: resolution.effectiveQuery,
     unsupportedGuardMatched: variant === 'candidate' && isClearlyUnsupportedQuery(entry.query),
+    guardCategory: resolution.guardDecision?.category,
     curatedKnowledgeId: variant === 'candidate' ? matchCuratedKnowledgeId(entry.query, config.bot.id) : undefined,
     smallTalkIntent: resolution.smallTalkIntent,
     actualPolicy: actualPolicyOf(resolution),
     routeDecision: resolution.routeDecision,
     status: result?.status,
     confidence: result?.confidence,
+    answerTrust: resolution.answerTrust,
     score: result?.score,
     scoreMargin: result?.scoreMargin,
     matchedFields: result?.matchedFields ?? [],
@@ -312,7 +323,7 @@ function metricSummary(records: ConversationAuditRecord[]): ConversationAuditSum
     acceptable: records.filter((record) => record.verdict.overall === 'acceptable').length,
     needsImprovement: records.filter((record) => record.verdict.overall === 'needs-improvement').length,
     unsafe: records.filter((record) => record.verdict.overall === 'unsafe').length,
-    retrievalFailures: records.filter((record) => !record.verdict.retrievalPass).length,
+    retrievalFailures: records.filter((record) => record.verdict.retrievalVerdict === 'fail').length,
     routingFailures: records.filter((record) => !record.verdict.routingPass).length,
     groundingFailures: records.filter((record) => !record.verdict.groundednessPass).length,
     calibrationFailures: records.filter((record) => !record.verdict.calibrationPass).length,

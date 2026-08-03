@@ -55,18 +55,20 @@ describe('conversation accuracy and suitability audit', () => {
     });
   }, 20_000);
 
-  it('surfaces known ambiguity, generic answer, and confidence calibration gaps', () => {
+  it('keeps ambiguity explicit, uses question-specific answers, and calibrates answer trust', () => {
     const result = fullAudit;
     const findings = new Map(result.summary.priorityFindings.map((finding) => [finding.code, finding]));
-    expect(findings.get('wrong-route')?.count).toBeGreaterThanOrEqual(6);
-    expect(findings.get('generic-answer')?.count).toBe(40);
-    expect(findings.get('source-confidence-mismatch')?.count).toBeGreaterThan(0);
+    expect(findings.has('wrong-route')).toBe(false);
+    expect(findings.has('wrong-retrieval')).toBe(false);
+    expect(findings.has('generic-answer')).toBe(false);
+    expect(findings.has('source-confidence-mismatch')).toBe(false);
+    expect(result.summary.candidate.calibrationFailures).toBe(0);
     expect(result.summary.knowledge).toMatchObject({
       known: 4,
       draftSafe: 46,
       unverifiable: 46,
-      direct: 10,
-      genericOrDeflective: 40,
+      direct: 50,
+      genericOrDeflective: 0,
     });
     expect(renderConversationAuditMarkdown(result)).toContain('Candidate 실패 trace');
   }, 20_000);

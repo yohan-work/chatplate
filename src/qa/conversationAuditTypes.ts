@@ -1,8 +1,11 @@
 import type {
   AnswerMode,
+  AnswerTrust,
   ConversationEngineVariant,
   ConversationRouteDecision,
   KnowledgeRisk,
+  KnowledgeApprovalStatus,
+  GuardCategory,
   MatchedField,
   SearchConfidence,
   SearchScoreBreakdown,
@@ -50,11 +53,12 @@ export interface AuditedCandidate {
   source?: string;
   answerMode?: AnswerMode;
   riskLevel?: KnowledgeRisk;
+  approvalStatus: KnowledgeApprovalStatus;
   handoffRecommended: boolean;
 }
 
 export interface ConversationAuditVerdict {
-  retrievalPass: boolean;
+  retrievalVerdict: 'pass' | 'fail' | 'not-applicable';
   routingPass: boolean;
   groundednessPass: boolean;
   calibrationPass: boolean;
@@ -73,12 +77,14 @@ export interface ConversationAuditRecord {
   normalizedQuery: string;
   effectiveQuery: string;
   unsupportedGuardMatched: boolean;
+  guardCategory?: GuardCategory;
   curatedKnowledgeId?: string;
   smallTalkIntent?: SmallTalkIntentId;
   actualPolicy: AuditProcessingPolicy;
   routeDecision?: ConversationRouteDecision;
   status?: 'answer' | 'suggestions' | 'fallback';
   confidence?: SearchConfidence;
+  answerTrust?: AnswerTrust;
   score?: number;
   scoreMargin?: number;
   matchedFields: MatchedField[];

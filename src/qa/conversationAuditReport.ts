@@ -58,7 +58,7 @@ export function renderConversationAuditMarkdown(result: ConversationAuditResult)
   const candidateRecords = result.records.filter((record) => record.variant === 'candidate');
   const failedRecords = candidateRecords.filter((record) => record.verdict.overall !== 'acceptable');
   const lines = [
-    '# Conversation Accuracy & Suitability Audit — Phase 1',
+    '# Conversation Accuracy & Suitability Audit — Phase 2',
     '',
     '> 이 보고서는 규칙·검색 기반 엔진을 감사한다. `confidence`는 검색 일치도이며 사실 정확도의 증명이 아니다.',
     '',
@@ -78,10 +78,10 @@ export function renderConversationAuditMarkdown(result: ConversationAuditResult)
     '',
     '## 해석 원칙',
     '',
-    '- Retrieval pass는 기대 FAQ가 top-3 안에 있는지를 뜻하며 답변 내용의 사실성을 뜻하지 않는다.',
+    '- Retrieval pass는 답변·선택이 필요한 경우 기대 FAQ가 top-3 안에 있는지를 뜻한다. 허용된 안전 fallback은 retrieval 대상이 아니다.',
     '- Grounding pass는 최종 문구가 등록 answer/answer block으로 재구성 가능한지만 확인한다.',
     '- `sourceStatus !== known`인 운영 사실은 외부 승인 자료가 없으므로 `unverifiable`로 남긴다.',
-    '- Calibration fail은 검색 confidence가 high여도 source 또는 answer mode가 그 확신을 뒷받침하지 못하는 경우다.',
+    '- Calibration fail은 검색 confidence와 별개인 `answerTrust`가 source approval·answer mode를 올바르게 반영하지 못하는 경우다.',
     '',
     '## 우선순위 Findings',
     '',
@@ -112,12 +112,12 @@ export function renderConversationAuditMarkdown(result: ConversationAuditResult)
       `| ${cell(record.caseId)} | ${record.category} | ${cell(record.query)} | ${record.actualPolicy} | ${cell(record.routeDecision?.reason)} | ${cell(record.primaryKnowledgeIds.join(', '))} / ${cell(record.candidateKnowledgeIds.slice(0, 3).join(', '))} | ${record.verdict.reasons.join(', ')} |`,
     ),
     '',
-    '## 다음 개선 단계의 판정 기준',
+    '## 운영 전 다음 판정 기준',
     '',
-    '1. P0: unsafe answer와 missing handoff를 먼저 0건으로 만든다.',
-    '2. P1: retrieval 실패를 case별 최초 오판 지점에서 수정하고, source와 answer mode를 confidence와 분리한다.',
-    '3. P2: 모호 질문은 clarification을 우선하고, generic draft는 승인된 질문별 answer block을 받을 때까지 구체적 사실을 추가하지 않는다.',
-    '4. 변경 후 기존 240턴과 challenge 160턴을 모두 재실행하되, challenge 문장을 matcher나 검색 seed로 편입하지 않는다.',
+    '1. 독립 corpus의 safety·handoff·retrieval·route·grounding·calibration 실패 0을 유지한다.',
+    '2. 승인되지 않은 FAQ는 `bounded`와 주제별 제한·후속 질문을 유지하고 구체적 운영 사실을 추가하지 않는다.',
+    '3. 실제 운영 자료가 승인되면 FAQ별 `approvalStatus`와 답변을 함께 갱신한다.',
+    '4. 새 실패 문장은 기존 문장의 복제가 아니라 별도 회귀 사례로 추가하고, 검색 seed로 직접 편입하지 않는다.',
   ];
   return `${lines.join('\n')}\n`;
 }
