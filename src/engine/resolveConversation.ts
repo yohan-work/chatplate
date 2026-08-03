@@ -9,7 +9,7 @@ import type {
   SmallTalkRule,
 } from '../types/chatbot';
 import { composeResponsePlan } from './composeResponsePlan';
-import { isClearlyUnsupportedQuery } from './detectUnsupportedQuery';
+import { classifyGuardedQuery } from './detectUnsupportedQuery';
 import { normalizeText } from './normalizeText';
 import { extractQueryFeatures } from './queryFeatures';
 import { routeConversationQuery } from './routeConversationQuery';
@@ -86,6 +86,7 @@ function smallTalkResolution(originalQuery: string, effectiveQuery: string, rule
     replyText: rule.response,
     handoffCta: rule.handoffCta,
     showSuggestions: rule.showSuggestions,
+    answerTrust: 'verified',
   };
 }
 
@@ -127,14 +128,16 @@ function knowledgeResolution(
 ): ConversationResolution {
   const route = routeConversationQuery(effectiveQuery, botConfig, { intentId, context, variant });
   const searchResult = route.result;
+  const responsePlan = route.decision.mode === 'clarification'
+    ? undefined
+    : composeResponsePlan(effectiveQuery, searchResult, context, { continued: route.continued });
   return {
     kind: searchResult.status === 'fallback' ? 'fallback' : 'knowledge',
     originalQuery,
     effectiveQuery: route.effectiveQuery,
     searchResult,
-    responsePlan: route.decision.mode === 'clarification'
-      ? undefined
-      : composeResponsePlan(effectiveQuery, searchResult, context, { continued: route.continued }),
+    responsePlan,
+    answerTrust: responsePlan?.answerTrust,
     contextPatch: contextPatch(effectiveQuery, searchResult, context, route.decision.mode === 'clarification'),
     routeDecision: route.decision,
     clarificationPrompt: route.clarificationPrompt,
@@ -213,11 +216,16 @@ export function resolveConversation(
     return smallTalkResolution(query, normalized, noiseRule);
   }
 
-  if (options?.variant !== 'baseline' && isClearlyUnsupportedQuery(query)) {
+  const guardDecision = options?.variant === 'baseline' ? undefined : classifyGuardedQuery(query);
+  if (guardDecision) {
     return {
       kind: 'fallback',
       originalQuery: query,
       effectiveQuery: normalized,
+      replyText: guardDecision.replyText,
+      handoffCta: guardDecision.handoffCta,
+      answerTrust: 'bounded',
+      guardDecision,
       searchResult: {
         status: 'fallback',
         confidence: 'low',
@@ -225,11 +233,11 @@ export function resolveConversation(
         suggestions: [],
         alternatives: [],
         matchedFields: [],
-        decisionReason: 'low-similarity',
+        decisionReason: 'guarded',
       },
       routeDecision: {
         mode: 'fallback',
-        reason: 'both-low',
+        reason: 'guarded',
         standaloneScore: 0,
       },
     };

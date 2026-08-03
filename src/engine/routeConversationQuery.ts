@@ -8,6 +8,7 @@ import type {
   SearchResult,
 } from '../types/chatbot';
 import { extractQueryFeatures } from './queryFeatures';
+import { detectAmbiguousQuery } from './detectAmbiguousQuery';
 import { findKnowledgeById, searchKnowledge } from './searchKnowledge';
 
 const CONTEXT_TTL_MS = 10 * 60 * 1000;
@@ -95,6 +96,16 @@ export function routeConversationQuery(
   const context = options?.context;
   const now = options?.now ?? Date.now();
   if (!context || now - context.updatedAt > CONTEXT_TTL_MS) {
+    const ambiguity = options?.variant === 'baseline' ? undefined : detectAmbiguousQuery(query, botConfig);
+    if (ambiguity) {
+      return {
+        effectiveQuery: query,
+        result: ambiguity.result,
+        decision: decision('clarification', 'standalone-ambiguity', standalone),
+        continued: false,
+        clarificationPrompt: ambiguity.prompt,
+      };
+    }
     return {
       effectiveQuery: query,
       result: standalone,
@@ -104,6 +115,30 @@ export function routeConversationQuery(
   }
 
   const features = extractQueryFeatures(query);
+
+  if (
+    context.pendingCandidateIds.length > 0 &&
+    features.referenceStrength === 'none' &&
+    (standalone.status !== 'answer' || standalone.score < 0.9)
+  ) {
+    const pending = context.pendingCandidateIds
+      .map((id) => findKnowledgeById(botConfig, id))
+      .filter((item): item is KnowledgeItem => Boolean(item));
+    if (pending.length) {
+      const pendingResult = searchKnowledge(query, { ...botConfig, knowledge: pending }, {
+        intentId: options?.intentId,
+        variant: options?.variant,
+      });
+      if (pendingResult.status === 'answer' && leadingItem(pendingResult)) {
+        return {
+          effectiveQuery: query,
+          result: pendingResult,
+          decision: decision('contextual', 'pending-selection', standalone, pendingResult),
+          continued: true,
+        };
+      }
+    }
+  }
   const enrichedQuery = contextualQuery(query, context);
   const contextual = searchKnowledge(enrichedQuery, botConfig, {
     intentId: context.lastIntentId ?? options?.intentId,
