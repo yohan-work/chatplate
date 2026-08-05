@@ -20,11 +20,12 @@ export function searchKnowledge(
   const matchedCuratedKnowledgeId = options?.variant === 'baseline'
     ? undefined
     : matchCuratedKnowledgeId(query, botConfig.bot.id);
+  const explicitlyRequestsMultiple = /(?:둘\s*다|두\s*가지|한\s*번에|같이|함께|각각|구분|모두)/u.test(analysis.normalized);
   const curatedKnowledgeId = result.decisionReason === 'exact'
     ? undefined
     : matchedCuratedKnowledgeId;
   const curatedItem = curatedKnowledgeId ? findKnowledgeById(botConfig, curatedKnowledgeId) : undefined;
-  if (analysis.intents.length === 1 && curatedItem && (curatedItem.status ?? 'active') === 'active') {
+  if ((!explicitlyRequestsMultiple || analysis.intents.length === 1) && curatedItem && (curatedItem.status ?? 'active') === 'active') {
     const relatedItems = curatedItem.relatedIds
       .map((id) => findKnowledgeById(botConfig, id))
       .filter((item): item is KnowledgeItem => Boolean(item))

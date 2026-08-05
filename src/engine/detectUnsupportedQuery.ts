@@ -119,7 +119,12 @@ const GUARD_RULES: GuardRule[] = [
 
 export function classifyGuardedQuery(query: string): GuardDecision | undefined {
   const normalized = normalizeText(query);
-  const rule = GUARD_RULES.find((entry) => entry.patterns.some((pattern) => pattern.test(normalized)));
+  const asksAboutRequiredContact = !/(?:코치|상담원|선생님|개인\s*연락처)/u.test(normalized) &&
+    /(?:실명|연락처|전화번호).*(?:필요|필수|꼭|제공|남겨)/u.test(normalized);
+  const rule = GUARD_RULES.find((entry) =>
+    !(entry.category === 'private-contact' && asksAboutRequiredContact) &&
+    entry.patterns.some((pattern) => pattern.test(normalized)),
+  );
   return rule ? { category: rule.category, replyText: rule.replyText, handoffCta: true } : undefined;
 }
 

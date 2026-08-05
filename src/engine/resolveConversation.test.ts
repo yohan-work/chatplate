@@ -7,6 +7,21 @@ import { resolveConversation, validateSmallTalkConfig } from './resolveConversat
 const coach = botConfigs['coach-myway'];
 
 describe('resolveConversation', () => {
+  it('resolves both privacy intents after a discourse preamble', () => {
+    const result = resolveConversation(
+      '한 번에 두 가지 확인할게요. 실명과 연락처가 필요한지, 상담 기록은 누가 보는지도 알려주세요',
+      botConfigs['coach-myway'],
+      { variant: 'candidate' },
+    );
+    expect(result.searchResult?.items?.map((item) => item.id)).toEqual(['privacy-003', 'privacy-005']);
+  });
+  it.each([
+    ['아이가 고등학생이라 늦은 건 아닐지 걱정돼요. 대상인가요?', 'fit-009'],
+    ['결제 방법을 못 찾아서 답답해요. 카드도 되나요?', 'pricing-004'],
+  ])('keeps the domain intent inside an emotional wrapper: %s', (query, expectedId) => {
+    const result = resolveConversation(query, botConfigs['coach-myway'], { variant: 'candidate' });
+    expect(result.searchResult?.item?.id).toBe(expectedId);
+  });
   it.each([
     ['안녕하세요', 'greeting'],
     ['감사합니다', 'thanks'],

@@ -5,6 +5,27 @@ import { normalizeText } from './normalizeText';
 import { evaluateSearchDataset } from './evaluateSearchDataset';
 
 describe('searchKnowledge', () => {
+  it('prefers curated service intent over an advice tie for a single-subject statement', () => {
+    const result = searchKnowledge('수학 한 과목만 어려워요', botConfigs['coach-myway'], { variant: 'candidate' });
+    expect(result.status).toBe('answer');
+    expect(result.item?.id).toBe('fit-006');
+  });
+
+  it('does not split a relationship particle into false multiple intents', () => {
+    const result = searchKnowledge('코치와 안 맞을까 봐 걱정돼요. 바꿀 수 있나요?', botConfigs['coach-myway'], { variant: 'candidate' });
+    expect(result.status).toBe('answer');
+    expect(result.item?.id).toBe('program-008');
+  });
+
+  it('keeps the explicit grade target ahead of a generic supported-subject match', () => {
+    const result = searchKnowledge('아이가 고등학생이라 늦은 건 아닐지 걱정돼요 대상인가요', botConfigs['coach-myway'], { variant: 'candidate' });
+    expect(result.item?.id).toBe('fit-009');
+  });
+
+  it('recognizes an explicit card-payment follow-up in an emotional wrapper', () => {
+    const result = searchKnowledge('결제 방법을 못 찾아서 답답해요 카드도 되나요', botConfigs['coach-myway'], { variant: 'candidate' });
+    expect(result.item?.id).toBe('pricing-004');
+  });
   it('returns an installation answer for a direct install question', () => {
     const result = searchKnowledge('설치는 어떻게 하나요?', botConfigs['alf-demo']);
     expect(result.status).toBe('answer');

@@ -7,8 +7,9 @@ import type {
 } from '../types/chatbot';
 import { normalizeText } from './normalizeText';
 
-const SEGMENT_CONNECTOR = /\s*(?:[,.!?;\n]|그리고|또한|또|및|(?:이랑|랑|와|과|하고)\s+)\s*/gu;
-const IMPLICIT_QUESTION_BOUNDARY = /((?:궁금해요|궁금합니다|가능한가요|되나요|받나요|하나요|인가요|어디인가요|언제인가요|알려주세요|지켜요|급해요|어려워요))\s+(?=\S)/gu;
+const CLAUSE_CONNECTOR = /((?:인지|는지|한지|여부|방법|내용|기준|범위|시점|절차|방식|횟수|위치|시간|관리|상담|코칭|경우))\s*(?:이랑|랑|와|과|하고)\s+/gu;
+const SEGMENT_CONNECTOR = /\s*(?:[,.!?;\n]|그리고|또한|또|및)\s*/gu;
+const IMPLICIT_QUESTION_BOUNDARY = /((?:궁금해요|궁금합니다|가능한가요|되나요|받나요|하나요|인가요|다른가요|어디인가요|언제인가요|알려주세요|지켜요|급해요|어려워요|없어요))\s+(?=\S)/gu;
 const QUESTION_TAIL = /(?:알려\s*주세요|알려\s*줘|궁금해요|궁금합니다|문의해요|확인해\s*주세요)$/u;
 
 const RELATIONSHIP_PATTERNS: Array<{ intentId: SmallTalkIntentId; pattern: RegExp; acknowledgement: string }> = [
@@ -101,12 +102,22 @@ function looksLikeRelationshipOnly(value: string, relationshipPattern?: RegExp):
 export function analyzeConversationInput(query: string, context?: ConversationContext): ConversationInputAnalysis {
   const normalized = normalizeText(query);
   const relationship = RELATIONSHIP_PATTERNS.find(({ pattern }) => pattern.test(normalized));
-  const separated = query.replace(IMPLICIT_QUESTION_BOUNDARY, '$1\n');
+  const separated = query
+    .replace(IMPLICIT_QUESTION_BOUNDARY, '$1\n')
+    .replace(CLAUSE_CONNECTOR, '$1\n');
   const rawSegments = separated
     .split(SEGMENT_CONNECTOR)
     .map((segment) => segment.trim())
     .filter((segment) => normalizeText(segment).length >= 2);
-  const values = rawSegments.length ? rawSegments : [query];
+  const values = (rawSegments.length ? rawSegments : [query]).reduce<string[]>((merged, segment) => {
+    const normalizedSegment = normalizeText(segment);
+    const genericTail = normalizedSegment.length <= 18 && /(?:인가요|나요|예요)$/u.test(normalizedSegment);
+    const previous = merged.at(-1);
+    if (genericTail && previous && RELATIONSHIP_PATTERNS.some(({ pattern }) => pattern.test(normalizeText(previous)))) {
+      merged[merged.length - 1] = `${previous} ${segment}`;
+    } else merged.push(segment);
+    return merged;
+  }, []);
   const segments = values.map((text) => {
     const value = normalizeText(text);
     return {

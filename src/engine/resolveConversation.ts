@@ -540,7 +540,8 @@ export function resolveConversation(
 
   const rules = normalizedRules(smallTalk);
   const rawNormalized = normalizeText(query);
-  const normalized = stripDiscoursePreamble(rawNormalized) || rawNormalized;
+  const queryWithoutPreamble = stripDiscoursePreamble(query) || query;
+  const normalized = normalizeText(queryWithoutPreamble) || rawNormalized;
   const noiseRule = rules.find((rule) => rule.intentId === 'noise');
   const compact = normalized.replace(/\s/g, '');
   if ((!normalized || query.length > MAX_INPUT_LENGTH || REPEATED_CHARACTER.test(compact)) && noiseRule) {
@@ -602,12 +603,13 @@ export function resolveConversation(
       return smallTalkResolution(query, normalized, stripped.matchedRule, options?.context, analysis);
     }
     const effective = stripDiscoursePreamble(stripped.query) || stripped.query;
-    const effectiveAnalysis = effective === stripped.query ? analysis : analyzeConversationInput(effective, options?.context);
+    const effectiveAnalysis = analyzeConversationInput(effective, options?.context);
     effectiveAnalysis.audience = analysis.audience;
+    effectiveAnalysis.segments = analysis.segments;
     return knowledgeResolution(query, effective, botConfig, options?.intentId, options?.context, options?.variant, effectiveAnalysis);
   }
 
-  const effective = normalized !== rawNormalized ? normalized : query;
+  const effective = queryWithoutPreamble !== query ? queryWithoutPreamble : query;
   const effectiveAnalysis = effective === query ? analysis : analyzeConversationInput(effective, options?.context);
   effectiveAnalysis.audience = analysis.audience;
   return knowledgeResolution(query, effective, botConfig, options?.intentId, options?.context, options?.variant, effectiveAnalysis);
