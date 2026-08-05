@@ -92,6 +92,12 @@ widget.destroy();
 - 상담 티켓 JSON/CSV 다운로드
 - 외부 삽입 코드 복사
 
+### 코치마이웨이 FAQ 승인
+
+코치마이웨이의 검색 일치도(`confidence`)와 사실 신뢰도(`answerTrust`)는 별도로 관리합니다. 관리자 FAQ 화면에서 `approvalStatus`, 출처, 검토자, 검토일, 필요한 경우 재검토일을 입력해야 확정 답변으로 배포할 수 있습니다. 재검토일이 지났거나 승인 근거가 빠진 답변은 자동으로 제한 안내와 상담 연결 범위로 낮아집니다.
+
+검색 품질 화면의 운영 질문은 alias에 즉시 반영되지 않습니다. 먼저 `검토 대기 표현`으로 저장되고, FAQ 화면에서 승인한 표현만 검색용 train 데이터가 됩니다. 우선 검토 대상 15개는 `src/data/coachMywayApprovalPriorities.ts`와 `docs/coach-myway/faq-approval-workbook.md`에 정리되어 있습니다. 이 흐름에는 별도 LLM·모델 서버가 필요하지 않습니다.
+
 ## 상담 티켓 운영
 
 기본 개발 모드는 `VITE_CHAT_REPOSITORY=local`입니다. 고객 대화가 브라우저 localStorage에 저장되므로 고객·관리자 흐름을 한 브라우저에서 시연할 수 있습니다.

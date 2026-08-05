@@ -20,6 +20,14 @@ const knowledgeSchema = z.object({
   relatedIds: z.array(z.string()),
   priority: z.number().int(),
   status: z.enum(['active', 'draft', 'archived']).optional(),
+  approvalStatus: z.enum(['verified', 'pending', 'unknown']).optional(),
+  answerMode: z.enum(['verified', 'safe-general', 'handoff']).optional(),
+  riskLevel: z.enum(['low', 'policy', 'personal']).optional(),
+  source: z.string().optional(),
+  reviewedBy: z.string().optional(),
+  reviewedAt: z.string().optional(),
+  nextReviewAt: z.string().optional(),
+  approvalNote: z.string().optional(),
 }).passthrough();
 
 export const botConfigSchema = z.object({

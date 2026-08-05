@@ -262,6 +262,10 @@ export interface KnowledgeItem {
   answerMode?: AnswerMode;
   riskLevel?: KnowledgeRisk;
   approvalStatus?: KnowledgeApprovalStatus;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  nextReviewAt?: string;
+  approvalNote?: string;
   tags?: string[];
   negativeKeywords?: string[];
   answer: string;

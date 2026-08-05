@@ -68,15 +68,19 @@ export function enrichCoachMywayKnowledge(item: KnowledgeItem): KnowledgeItem {
     : intent === 'fit' || intent === 'privacy'
       ? 'personal'
       : 'low';
+  const approvalStatus = item.approvalStatus ?? (
+    item.source?.startsWith('http') || item.source === '개인정보 최소 수집 운영 원칙' ? 'verified' : 'pending'
+  );
   return {
     ...item,
     status: 'active',
     utterances: buildCoachMywayUtterances(item),
     answerMode: item.answerMode ?? (riskLevel === 'low' ? 'verified' : riskLevel === 'policy' ? 'handoff' : 'safe-general'),
     riskLevel: item.riskLevel ?? riskLevel,
-    approvalStatus: item.approvalStatus ?? (
-      item.source?.startsWith('http') || item.source === '개인정보 최소 수집 운영 원칙' ? 'verified' : 'pending'
-    ),
+    approvalStatus,
+    reviewedBy: item.reviewedBy ?? (approvalStatus === 'verified' ? '레포 기존 승인 자료' : undefined),
+    reviewedAt: item.reviewedAt ?? (approvalStatus === 'verified' ? item.lastUpdated : undefined),
+    nextReviewAt: item.nextReviewAt ?? (approvalStatus === 'verified' && item.id === 'hours-001' ? '2027-07-27' : undefined),
   };
 }
 

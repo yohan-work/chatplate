@@ -20,9 +20,12 @@ import {
   Users,
 } from 'lucide-react';
 import { searchKnowledge } from '../../engine/searchKnowledge';
+import { answerTrustFor } from '../../engine/answerTrust';
+import { knowledgeApprovalIssues } from '../../engine/knowledgeApproval';
 import { evaluateSearchDataset, type EvaluationMetrics } from '../../engine/evaluateSearchDataset';
 import { validateSmallTalkConfig } from '../../engine/resolveConversation';
 import { resolveSmallTalkConfig } from '../../data/smallTalkDefaults';
+import { coachMywayApprovalPrioritySet } from '../../data/coachMywayApprovalPriorities';
 import type {
   AdminPanelView,
   AdminProfile,
@@ -575,6 +578,9 @@ function KnowledgeEditor({
 }) {
   const [selectedKnowledgeId, setSelectedKnowledgeId] = useState(config.knowledge[0]?.id ?? '');
   const selectedKnowledge = config.knowledge.find((item) => item.id === selectedKnowledgeId) ?? config.knowledge[0];
+  const approvalIssues = selectedKnowledge ? knowledgeApprovalIssues(selectedKnowledge) : [];
+  const answerTrust = selectedKnowledge ? answerTrustFor(selectedKnowledge) : undefined;
+  const pendingProductionUtterances = selectedKnowledge?.utterances?.filter((utterance) => utterance.source === 'production' && !utterance.approved) ?? [];
   const defaultCategoryId = config.categories[0]?.id ?? 'general';
 
   const updateKnowledge = (knowledgeId: string, patch: Partial<KnowledgeItem>) => {
@@ -608,7 +614,10 @@ function KnowledgeEditor({
               onClick={() => setSelectedKnowledgeId(item.id)}
             >
               <strong>{item.question}</strong>
-              <span>{item.keywords.join(', ') || '키워드 없음'}</span>
+              <span>
+                {coachMywayApprovalPrioritySet.has(item.id) ? '우선 검토 · ' : ''}
+                {item.approvalStatus ?? 'unknown'} · {item.keywords.join(', ') || '키워드 없음'}
+              </span>
             </button>
           ))}
         </div>
@@ -627,6 +636,34 @@ function KnowledgeEditor({
             </label>
             <TextField label="키워드" value={formatCommaList(selectedKnowledge.keywords)} onChange={(value) => updateKnowledge(selectedKnowledge.id, { keywords: parseCommaList(value) })} />
             <TextField label="별칭 질문" value={formatCommaList(selectedKnowledge.aliases)} onChange={(value) => updateKnowledge(selectedKnowledge.id, { aliases: parseCommaList(value) })} />
+            {pendingProductionUtterances.length ? (
+              <div className="quality-alternatives">
+                <strong>운영 표현 검토 대기</strong>
+                {pendingProductionUtterances.map((utterance) => (
+                  <div className="data-actions" key={utterance.text}>
+                    <span>“{utterance.text}”</span>
+                    <button
+                      type="button"
+                      onClick={() => updateKnowledge(selectedKnowledge.id, {
+                        utterances: selectedKnowledge.utterances?.map((entry) => entry === utterance
+                          ? { ...entry, approved: true, split: 'train' }
+                          : entry),
+                      })}
+                    >
+                      검색 표현 승인
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateKnowledge(selectedKnowledge.id, {
+                        utterances: selectedKnowledge.utterances?.filter((entry) => entry !== utterance),
+                      })}
+                    >
+                      제외
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <TextField label="태그" value={formatCommaList(selectedKnowledge.tags ?? [])} onChange={(value) => updateKnowledge(selectedKnowledge.id, { tags: parseCommaList(value) })} />
             <TextField
               label="제외 키워드"
@@ -634,6 +671,50 @@ function KnowledgeEditor({
               onChange={(value) => updateKnowledge(selectedKnowledge.id, { negativeKeywords: parseCommaList(value) })}
             />
             <TextAreaField label="답변" value={selectedKnowledge.answer} rows={7} onChange={(value) => updateKnowledge(selectedKnowledge.id, { answer: value })} />
+            <div className="quality-alternatives" role="status">
+              <strong>사용자 노출 판정: {answerTrust}</strong>
+              <span>
+                {answerTrust === 'verified'
+                  ? '근거가 유효한 직접답변으로 노출됩니다.'
+                  : answerTrust === 'bounded'
+                    ? '등록된 안전 안내 범위로 제한하고 필요한 경우 상담 연결을 유지합니다.'
+                    : '사실 근거가 없어 확정 답변으로 노출하지 않습니다.'}
+              </span>
+              {approvalIssues.map((issue) => <span key={issue.code}>{issue.message}</span>)}
+            </div>
+            <label className="admin-field">
+              <span>승인 상태</span>
+              <select
+                value={selectedKnowledge.approvalStatus ?? 'unknown'}
+                onChange={(event) => updateKnowledge(selectedKnowledge.id, { approvalStatus: event.target.value as KnowledgeItem['approvalStatus'] })}
+              >
+                <option value="verified">verified</option>
+                <option value="pending">pending</option>
+                <option value="unknown">unknown</option>
+              </select>
+            </label>
+            <label className="admin-field">
+              <span>답변 모드</span>
+              <select
+                value={selectedKnowledge.answerMode ?? 'safe-general'}
+                onChange={(event) => updateKnowledge(selectedKnowledge.id, { answerMode: event.target.value as KnowledgeItem['answerMode'] })}
+              >
+                <option value="verified">verified</option>
+                <option value="safe-general">safe-general</option>
+                <option value="handoff">handoff</option>
+              </select>
+            </label>
+            <label className="admin-field">
+              <span>위험도</span>
+              <select
+                value={selectedKnowledge.riskLevel ?? 'low'}
+                onChange={(event) => updateKnowledge(selectedKnowledge.id, { riskLevel: event.target.value as KnowledgeItem['riskLevel'] })}
+              >
+                <option value="low">low</option>
+                <option value="policy">policy</option>
+                <option value="personal">personal</option>
+              </select>
+            </label>
             <label className="admin-field">
               <span>상태</span>
               <select
@@ -646,6 +727,10 @@ function KnowledgeEditor({
               </select>
             </label>
             <TextField label="출처" value={selectedKnowledge.source ?? ''} onChange={(value) => updateKnowledge(selectedKnowledge.id, { source: value })} />
+            <TextField label="검토자" value={selectedKnowledge.reviewedBy ?? ''} onChange={(value) => updateKnowledge(selectedKnowledge.id, { reviewedBy: value })} />
+            <TextField label="검토일 (YYYY-MM-DD)" value={selectedKnowledge.reviewedAt ?? ''} onChange={(value) => updateKnowledge(selectedKnowledge.id, { reviewedAt: value })} />
+            <TextField label="재검토일 (YYYY-MM-DD)" value={selectedKnowledge.nextReviewAt ?? ''} onChange={(value) => updateKnowledge(selectedKnowledge.id, { nextReviewAt: value })} />
+            <TextAreaField label="승인 조건·예외" value={selectedKnowledge.approvalNote ?? ''} rows={3} onChange={(value) => updateKnowledge(selectedKnowledge.id, { approvalNote: value })} />
             <label className="admin-check">
               <input
                 type="checkbox"
@@ -879,14 +964,25 @@ function SearchQualityPanel({
   const clarificationCount = events.filter((event) => event.routeMode === 'clarification').length;
   const recentRouteEvents = [...events].filter((event) => event.routeMode).slice(-5).reverse();
 
-  const addToKnowledgeField = (field: 'aliases' | 'keywords') => {
+  const queueUtteranceReview = () => {
     if (!matchedItem || !query.trim()) return;
     onUpdate((current) => ({
       ...current,
       knowledge: current.knowledge.map((item) => {
         if (item.id !== matchedItem.id) return item;
-        const values = new Set([...(item[field] ?? []), query.trim()]);
-        return { ...item, [field]: [...values], lastUpdated: new Date().toISOString() };
+        if (item.utterances?.some((utterance) => utterance.text === query.trim())) return item;
+        return {
+          ...item,
+          utterances: [...(item.utterances ?? []), {
+            text: query.trim(),
+            persona: 'neutral',
+            variation: 'contextual',
+            split: 'dev',
+            source: 'production',
+            approved: false,
+          }],
+          lastUpdated: new Date().toISOString(),
+        };
       }),
     }));
   };
@@ -991,11 +1087,8 @@ function SearchQualityPanel({
               {result.matchedUtterance ? <p>가장 가까운 발화: “{result.matchedUtterance}”</p> : null}
             </div>
             <div className="quality-actions">
-              <button type="button" onClick={() => addToKnowledgeField('aliases')} disabled={!matchedItem}>
-                alias로 추가
-              </button>
-              <button type="button" onClick={() => addToKnowledgeField('keywords')} disabled={!matchedItem}>
-                keyword로 추가
+              <button type="button" onClick={queueUtteranceReview} disabled={!matchedItem}>
+                검토 대기 표현으로 추가
               </button>
               <button type="button" onClick={createFaqFromQuery}>
                 새 FAQ 생성

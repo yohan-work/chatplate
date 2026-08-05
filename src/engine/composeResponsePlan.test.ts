@@ -30,6 +30,25 @@ describe('composeResponsePlan', () => {
     expect(first?.followUpPrompts).toContain('상담 방법도 알려드릴까요?');
   });
 
+  it('does not render stale verified facts as a direct answer', () => {
+    const stale = {
+      ...result.item!,
+      id: 'hours-001',
+      answer: '오래된 운영시간은 오전 9시입니다.',
+      approvalStatus: 'verified' as const,
+      answerMode: 'verified' as const,
+      riskLevel: 'low' as const,
+      source: '운영 문서',
+      reviewedBy: '운영자',
+      reviewedAt: '2025-01-01',
+      nextReviewAt: '2025-12-31',
+    };
+    const plan = composeResponsePlan('운영시간이 언제예요?', { ...result, item: stale, items: [stale] });
+    expect(plan?.answerTrust).toBe('bounded');
+    expect(plan?.text).not.toContain('오전 9시');
+    expect(plan?.text).toContain('최신 기준');
+  });
+
   it('separates pending answer trust from retrieval confidence', () => {
     const pending = {
       ...item,

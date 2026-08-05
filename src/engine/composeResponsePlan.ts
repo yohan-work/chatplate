@@ -1,5 +1,6 @@
 import type { ConversationAudience, ConversationContext, KnowledgeItem, ResponsePlan, SearchResult } from '../types/chatbot';
 import { combinedAnswerTrust } from './answerTrust';
+import { knowledgeApprovalIssues } from './knowledgeApproval';
 import { extractQueryFeatures } from './queryFeatures';
 
 const OPENINGS = [
@@ -15,6 +16,9 @@ function stableHash(value: string): number {
 }
 
 function answerFor(item: KnowledgeItem, variant: number): string {
+  if (item.approvalStatus === 'verified' && knowledgeApprovalIssues(item).some((issue) => issue.blocking)) {
+    return '이 안내는 현재 재검토가 필요해 구체적인 운영 조건을 확정해서 말씀드리기 어려워요. 최신 기준은 공식 상담 채널에서 확인해 주세요.';
+  }
   if (item.answerVariants?.length) return item.answerVariants[variant % item.answerVariants.length];
   if (item.answerMode === 'safe-general') return item.answer;
   const blocks = item.answerBlocks?.filter((block) => !block.condition).map((block) => block.text) ?? [];
@@ -22,6 +26,9 @@ function answerFor(item: KnowledgeItem, variant: number): string {
 }
 
 function shortAnswerFor(item: KnowledgeItem, variant: number): string {
+  if (item.approvalStatus === 'verified' && knowledgeApprovalIssues(item).some((issue) => issue.blocking)) {
+    return '재검토가 필요한 안내예요. 최신 기준은 공식 상담 채널에서 확인해 주세요.';
+  }
   return item.shortAnswer ?? item.answerVariants?.[variant % item.answerVariants.length] ?? item.answer;
 }
 

@@ -29,6 +29,9 @@ export function createEmptyKnowledge(categoryId: string): KnowledgeItem {
     relatedIds: [],
     priority: 5,
     status: 'draft',
+    approvalStatus: 'pending',
+    answerMode: 'safe-general',
+    riskLevel: 'low',
     lastUpdated: new Date().toISOString(),
   };
 }

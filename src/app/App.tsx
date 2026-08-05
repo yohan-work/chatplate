@@ -4,6 +4,7 @@ import { botConfigs, defaultBotId } from '../data/bots';
 import type { BotConfig, BotConfigMap } from '../types/chatbot';
 import { cloneBotConfigs, loadStoredBotConfigs, saveStoredBotConfigs } from '../utils/botConfigStorage';
 import { getBotConfigRepository } from '../services/getBotConfigRepository';
+import { botConfigApprovalErrors } from '../engine/knowledgeApproval';
 
 export function App() {
   const [selectedBotId, setSelectedBotId] = useState(defaultBotId);
@@ -78,6 +79,8 @@ export function App() {
   const saveDraft = async () => {
     setReleaseState((current) => ({ ...current, isWorking: true, message: undefined }));
     try {
+      const approvalErrors = botConfigApprovalErrors(editableBotConfigs[selectedBotId]);
+      if (approvalErrors.length) throw new Error(`승인 정보 확인 필요: ${approvalErrors.slice(0, 3).join(' / ')}`);
       const currentDraft = await configRepository.getDraft(selectedBotId);
       const draft = await configRepository.saveDraft(
         selectedBotId,
@@ -103,6 +106,8 @@ export function App() {
   const publishDraft = async () => {
     setReleaseState((current) => ({ ...current, isWorking: true, message: undefined }));
     try {
+      const approvalErrors = botConfigApprovalErrors(editableBotConfigs[selectedBotId]);
+      if (approvalErrors.length) throw new Error(`배포 차단: ${approvalErrors.slice(0, 3).join(' / ')}`);
       let draft = await configRepository.getDraft(selectedBotId);
       if (!draft) {
         draft = await configRepository.saveDraft(
