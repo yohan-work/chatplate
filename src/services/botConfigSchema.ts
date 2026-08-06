@@ -28,6 +28,13 @@ const knowledgeSchema = z.object({
   reviewedAt: z.string().optional(),
   nextReviewAt: z.string().optional(),
   approvalNote: z.string().optional(),
+  socratic: z.object({
+    conclusion: z.string().optional(),
+    conditions: z.array(nonEmpty).optional(),
+    evidence: z.array(nonEmpty).optional(),
+    nextActions: z.array(nonEmpty).optional(),
+    clarificationQuestion: z.string().optional(),
+  }).optional(),
 }).passthrough();
 
 export const botConfigSchema = z.object({

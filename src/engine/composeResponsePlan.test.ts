@@ -76,4 +76,21 @@ describe('composeResponsePlan', () => {
     );
     expect(plan?.text).toContain('앞선 문의와 이어서');
   });
+
+  it('uses only approved structured content for the socratic response', () => {
+    const plan = composeResponsePlan('중학생도 가능한가요?', {
+      ...result,
+      item: { ...item, socratic: { conclusion: '중학생 상담이 가능합니다.', conditions: ['현재 학습 상황을 상담에서 확인합니다.'], evidence: ['등록된 대상 안내'], nextActions: ['상담 방법을 확인해 주세요.'] } },
+      items: [{ ...item, socratic: { conclusion: '중학생 상담이 가능합니다.', conditions: ['현재 학습 상황을 상담에서 확인합니다.'], evidence: ['등록된 대상 안내'], nextActions: ['상담 방법을 확인해 주세요.'] } }],
+    }, undefined, { responseStyle: 'socratic' });
+    expect(plan?.text).toContain('판단 근거: 등록된 대상 안내');
+    expect(plan?.text).toContain('다음 행동');
+  });
+
+  it('does not bypass a blocking approval review with structured content', () => {
+    const stale = { ...item, approvalStatus: 'verified' as const, answerMode: 'verified' as const, source: '운영 문서', socratic: { conclusion: '오래된 조건입니다.' } };
+    const plan = composeResponsePlan('대상은?', { ...result, item: stale, items: [stale] }, undefined, { responseStyle: 'socratic' });
+    expect(plan?.text).toContain('재검토');
+    expect(plan?.text).not.toContain('오래된 조건입니다.');
+  });
 });

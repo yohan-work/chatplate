@@ -256,7 +256,9 @@ function knowledgeResolution(
         ? 'confirmation' as const
         : analysis.dialogueActs.includes('elaborate') || analysis.dialogueActs.includes('example')
           ? 'detailed' as const
-          : 'default' as const;
+          : variant === 'socratic'
+            ? 'socratic' as const
+            : 'default' as const;
   const controlOnly = /^(?:다시|짧게|간단히|한\s*줄로|자세히|구체적으로|상세히|예시|요약|정리|맞죠|맞나요|그렇다는\s*거죠|이해한.*맞).{0,14}$/u.test(analysis.normalized);
   const previousItems = routingContext?.lastKnowledgeIds
     .map((id) => findKnowledgeById(engineConfig, id))

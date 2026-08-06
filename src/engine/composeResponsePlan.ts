@@ -32,6 +32,19 @@ function shortAnswerFor(item: KnowledgeItem, variant: number): string {
   return item.shortAnswer ?? item.answerVariants?.[variant % item.answerVariants.length] ?? item.answer;
 }
 
+function socraticAnswerFor(item: KnowledgeItem, variant: number): string {
+  if (item.approvalStatus === 'verified' && knowledgeApprovalIssues(item).some((issue) => issue.blocking)) {
+    return answerFor(item, variant);
+  }
+  const guide = item.socratic;
+  const conclusion = guide?.conclusion ?? answerFor(item, variant);
+  const sections = [conclusion];
+  if (guide?.conditions?.length) sections.push(`확인할 조건: ${guide.conditions.join(' / ')}`);
+  if (guide?.evidence?.length) sections.push(`판단 근거: ${guide.evidence.join(' / ')}`);
+  if (guide?.nextActions?.length) sections.push(`다음 행동: ${guide.nextActions.join(' / ')}`);
+  return sections.join('\n');
+}
+
 export function composeResponsePlan(
   query: string,
   result: SearchResult,
@@ -41,7 +54,7 @@ export function composeResponsePlan(
     audience?: ConversationAudience;
     acknowledgement?: string;
     unresolvedSegments?: string[];
-    responseStyle?: 'default' | 'short' | 'detailed' | 'summary' | 'confirmation';
+    responseStyle?: 'default' | 'short' | 'detailed' | 'summary' | 'confirmation' | 'socratic';
   },
 ): ResponsePlan | undefined {
   const items = result.items ?? (result.item ? [result.item] : []);
@@ -57,7 +70,9 @@ export function composeResponsePlan(
       : answerTrust === 'bounded'
         ? '현재 등록된 안내 범위에서 말씀드리면,'
       : OPENINGS[variant];
-  const answerBuilder = options?.responseStyle === 'short' || options?.responseStyle === 'summary'
+  const answerBuilder = options?.responseStyle === 'socratic'
+    ? socraticAnswerFor
+    : options?.responseStyle === 'short' || options?.responseStyle === 'summary'
     ? shortAnswerFor
     : answerFor;
   const bodies = items.map((item) =>
@@ -84,6 +99,10 @@ export function composeResponsePlan(
     ? '네, 앞서 안내한 내용을 기준으로 이해하신 방향이 맞아요.'
     : '';
 
+  const clarification = options?.responseStyle === 'socratic' && items.length === 1 && items[0].socratic?.clarificationQuestion
+    ? `더 정확히 안내하려면 ${items[0].socratic.clarificationQuestion}`
+    : '';
+
   return {
     text: [
       options?.acknowledgement,
@@ -93,6 +112,7 @@ export function composeResponsePlan(
       entityAcknowledgement,
       ...bodies,
       unresolvedNotice,
+      clarification,
     ].filter(Boolean).join('\n\n'),
     knowledgeIds: items.map((item) => item.id),
     toneVariant: variant,

@@ -250,6 +250,15 @@ export interface AnswerBlock {
   condition?: string;
 }
 
+/** Approved facts used to compose a bounded, diagnostic-style response. */
+export interface SocraticAnswerGuide {
+  conclusion?: string;
+  conditions?: string[];
+  evidence?: string[];
+  nextActions?: string[];
+  clarificationQuestion?: string;
+}
+
 export interface KnowledgeItem {
   id: string;
   categoryId: string;
@@ -271,6 +280,7 @@ export interface KnowledgeItem {
   answer: string;
   shortAnswer?: string;
   answerBlocks?: AnswerBlock[];
+  socratic?: SocraticAnswerGuide;
   answerVariants?: string[];
   followUpPrompts?: string[];
   buttons: AnswerButton[];
