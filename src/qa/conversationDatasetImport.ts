@@ -63,6 +63,10 @@ export function conversationEventsFromCsv(csv: string): ConversationEvent[] {
     pendingCandidateIds: list(entry.pendingCandidateIds),
     contextRevision: entry.contextRevision ? Number(entry.contextRevision) : undefined,
     engineVersion: entry.engineVersion || undefined,
+    experimentId: entry.experimentId || undefined,
+    experimentVariant: (entry.experimentVariant || undefined) as ConversationEvent['experimentVariant'],
+    experimentAssignmentId: entry.experimentAssignmentId || undefined,
+    outcome: (entry.outcome || undefined) as ConversationEvent['outcome'],
     createdAt: entry.createdAt,
   }));
 }

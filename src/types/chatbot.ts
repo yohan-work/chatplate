@@ -419,7 +419,17 @@ export interface ResponsePlan {
 }
 
 export type ConversationRouteMode = 'standalone' | 'contextual' | 'clarification' | 'fallback';
-export type ConversationEngineVariant = 'baseline' | 'phase3' | 'candidate';
+export type ConversationEngineVariant = 'baseline' | 'phase3' | 'candidate' | 'socratic';
+
+export type ExperimentVariant = 'candidate' | 'socratic';
+export type ExperimentOutcome = 'resolved' | 'unresolved' | 'safety-handoff' | 'pending';
+
+export interface ConversationExperimentAssignment {
+  experimentId: string;
+  variant: ExperimentVariant;
+  assignmentId: string;
+  allocation: number;
+}
 
 export interface ConversationRouteDecision {
   mode: ConversationRouteMode;
@@ -512,6 +522,11 @@ export interface ConversationEvent {
   pendingCandidateIds?: string[];
   contextRevision?: number;
   engineVersion?: string;
+  experimentId?: string;
+  experimentVariant?: ExperimentVariant;
+  experimentAssignmentId?: string;
+  configVersion?: number;
+  outcome?: ExperimentOutcome;
   createdAt: string;
 }
 

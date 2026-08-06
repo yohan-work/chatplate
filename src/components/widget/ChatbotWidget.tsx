@@ -5,6 +5,7 @@ import { coachBotMark } from '../../assets/coachBotMark';
 import { getFallbackSuggestions } from '../../engine/getFallbackSuggestions';
 import { answerTrustFor } from '../../engine/answerTrust';
 import { resolveConversation } from '../../engine/resolveConversation';
+import { assignConversationExperiment, outcomeForConversationEvent } from '../../engine/conversationExperiment';
 import { findKnowledgeById, searchKnowledge } from '../../engine/searchKnowledge';
 import {
   appendConversationEvent,
@@ -19,6 +20,7 @@ import type {
   ClarificationOption,
   ConversationContact,
   ConversationContext,
+  ConversationEvent,
   CustomerJourney,
   KnowledgeItem,
   Notice,
@@ -427,7 +429,12 @@ export function ChatbotWidget({
         return;
       }
 
-      const resolution = resolveConversation(query, botConfig, { intentId: selectedIntentId, context: conversationContext });
+      const experiment = assignConversationExperiment(botConfig.bot.id, supportConversation.id);
+      const resolution = resolveConversation(query, botConfig, {
+        intentId: selectedIntentId,
+        context: conversationContext,
+        variant: experiment?.variant ?? 'candidate',
+      });
       if (resolution.contextPatch) setConversationContext(resolution.contextPatch);
       let botMessage: ChatMessage;
 
@@ -438,7 +445,11 @@ export function ChatbotWidget({
           replyText: resolution.replyText,
           dialogueActs: resolution.dialogueActs,
           contextRevision: resolution.contextPatch?.stateRevision,
-          engineVersion: 'phase6-rule-engine-v1',
+          engineVersion: experiment?.variant === 'socratic' ? 'phase6-socratic-v1' : 'phase6-rule-engine-v1',
+          experimentId: experiment?.experimentId,
+          experimentVariant: experiment?.variant,
+          experimentAssignmentId: experiment?.assignmentId,
+          outcome: outcomeForConversationEvent({ status: 'smalltalk', handoffCta: resolution.handoffCta, guardCategory: resolution.guardDecision?.category }),
         });
         if (repository.kind === 'local') appendConversationEvent(event);
         else void analyticsRepository.record(supportConversation.id, event).catch(() => undefined);
@@ -469,7 +480,15 @@ export function ChatbotWidget({
             resolvedIntentIds: resolution.resolvedIntents?.flatMap((intent) => intent.knowledgeIds),
             pendingCandidateIds: resolution.contextPatch?.pendingCandidateIds,
             contextRevision: resolution.contextPatch?.stateRevision,
-            engineVersion: 'phase6-rule-engine-v1',
+            engineVersion: experiment?.variant === 'socratic' ? 'phase6-socratic-v1' : 'phase6-rule-engine-v1',
+            experimentId: experiment?.experimentId,
+            experimentVariant: experiment?.variant,
+            experimentAssignmentId: experiment?.assignmentId,
+            outcome: outcomeForConversationEvent({
+              status: result.status,
+              handoffCta: result.confidence === 'low' || result.items?.some((item) => item.handoffRecommended),
+              guardCategory: resolution.guardDecision?.category,
+            }),
           },
         );
         if (repository.kind === 'local') appendConversationEvent(event);
@@ -674,6 +693,29 @@ export function ChatbotWidget({
             onAction={handleAction}
             onFeedback={(messageId, feedback) => {
               updateConversationEventFeedback(messageId, feedback);
+              if (repository.kind !== 'local' && supportConversation) {
+                const experiment = assignConversationExperiment(botConfig.bot.id, supportConversation.id);
+                if (experiment) {
+                  const feedbackEvent: ConversationEvent = {
+                    id: `feedback-${messageId}-${Date.now()}`,
+                    botId: botConfig.bot.id,
+                    conversationId: supportConversation.id,
+                    query: '',
+                    status: 'answer',
+                    confidence: 'high',
+                    matchedKnowledgeIds: [],
+                    interactionType: 'knowledge',
+                    feedback,
+                    replyPolicy: 'answer',
+                    experimentId: experiment.experimentId,
+                    experimentVariant: experiment.variant,
+                    experimentAssignmentId: experiment.assignmentId,
+                    outcome: feedback === 'helpful' ? 'resolved' : 'unresolved',
+                    createdAt: new Date().toISOString(),
+                  };
+                  void analyticsRepository.record(supportConversation.id, feedbackEvent).catch(() => undefined);
+                }
+              }
               setMessages((current) =>
                 current.map((message) => (message.id === messageId ? { ...message, feedback, handoffCta: feedback === 'not-helpful' || message.handoffCta } : message)),
               );

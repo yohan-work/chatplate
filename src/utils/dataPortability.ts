@@ -179,6 +179,10 @@ export function conversationEventsToCsv(events: ConversationEvent[]): string {
     'pendingCandidateIds',
     'contextRevision',
     'engineVersion',
+    'experimentId',
+    'experimentVariant',
+    'experimentAssignmentId',
+    'outcome',
     'createdAt',
   ];
   const rows = events.map((event) => {
@@ -221,6 +225,10 @@ export function conversationEventsToCsv(events: ConversationEvent[]): string {
     event.pendingCandidateIds?.join('|') ?? '',
     event.contextRevision ?? '',
     event.engineVersion ?? '',
+    event.experimentId ?? '',
+    event.experimentVariant ?? '',
+    event.experimentAssignmentId ?? '',
+    event.outcome ?? '',
     event.createdAt,
     ];
   });

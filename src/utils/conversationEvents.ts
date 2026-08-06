@@ -1,3 +1,4 @@
+import { outcomeForConversationEvent } from '../engine/conversationExperiment';
 import type { ConversationEvent, ConversationResolution, ConversationRouteDecision, SearchResult } from '../types/chatbot';
 
 export const CONVERSATION_EVENTS_STORAGE_KEY = 'chatplate:conversation-events:v1';
@@ -20,7 +21,7 @@ export function createConversationEvent(
   effectiveQuery = query,
   routeDecision?: ConversationRouteDecision,
   resolution?: Pick<ConversationResolution, 'answerTrust' | 'guardDecision'>,
-  metadata?: Pick<ConversationEvent, 'conversationId' | 'turnIndex' | 'replyPolicy' | 'replyText' | 'dialogueActs' | 'resolvedIntentIds' | 'pendingCandidateIds' | 'contextRevision' | 'engineVersion'>,
+  metadata?: Pick<ConversationEvent, 'conversationId' | 'turnIndex' | 'replyPolicy' | 'replyText' | 'dialogueActs' | 'resolvedIntentIds' | 'pendingCandidateIds' | 'contextRevision' | 'engineVersion' | 'experimentId' | 'experimentVariant' | 'experimentAssignmentId' | 'outcome'>,
 ): ConversationEvent {
   const matchedItems = result.items ?? (result.item ? [result.item] : []);
   const candidateItems = [...matchedItems, ...result.suggestions, ...result.alternatives];
@@ -55,7 +56,7 @@ export function createConversationEvent(
 export function createSmallTalkConversationEvent(
   botId: string,
   resolution: ConversationResolution,
-  metadata?: Pick<ConversationEvent, 'conversationId' | 'turnIndex' | 'replyText' | 'dialogueActs' | 'contextRevision' | 'engineVersion'>,
+  metadata?: Pick<ConversationEvent, 'conversationId' | 'turnIndex' | 'replyText' | 'dialogueActs' | 'contextRevision' | 'engineVersion' | 'experimentId' | 'experimentVariant' | 'experimentAssignmentId' | 'outcome'>,
 ): ConversationEvent {
   return {
     id: `event-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -102,7 +103,9 @@ export function updateConversationEventFeedback(
   storage: StorageLike | null = getBrowserStorage(),
 ): void {
   saveConversationEvents(
-    loadConversationEvents(storage).map((event) => (event.id === eventId ? { ...event, feedback } : event)),
+    loadConversationEvents(storage).map((event) => event.id === eventId
+      ? { ...event, feedback, outcome: outcomeForConversationEvent({ ...event, feedback, handoffCta: event.outcome === 'safety-handoff' }) }
+      : event),
     storage,
   );
 }

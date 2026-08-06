@@ -23,6 +23,8 @@ import { searchKnowledge } from '../../engine/searchKnowledge';
 import { answerTrustFor } from '../../engine/answerTrust';
 import { knowledgeApprovalIssues } from '../../engine/knowledgeApproval';
 import { evaluateSearchDataset, type EvaluationMetrics } from '../../engine/evaluateSearchDataset';
+import { COACH_MYWAY_EXPERIMENT_ID } from '../../engine/conversationExperiment';
+import { summarizeExperiment } from '../../engine/experimentMetrics';
 import { validateSmallTalkConfig } from '../../engine/resolveConversation';
 import { resolveSmallTalkConfig } from '../../data/smallTalkDefaults';
 import { coachMywayApprovalPrioritySet } from '../../data/coachMywayApprovalPriorities';
@@ -31,6 +33,7 @@ import type {
   AdminProfile,
   BotConfig,
   BotConfigMap,
+  ConversationEvent,
   ConversationSlaFilter,
   KnowledgeItem,
   NotificationOutboxItem,
@@ -57,6 +60,7 @@ import { clearTickets, loadTickets, ticketsToCsv } from '../../utils/ticketStora
 import { createClientMessageId, type ChatRepository } from '../../services/chatRepository';
 import { getChatRepository } from '../../services/getChatRepository';
 import { LocalChatRepository } from '../../services/localChatRepository';
+import { getAnalyticsRepository } from '../../services/analyticsRepository';
 import {
   formatSupportHours,
   getConversationSlaState,
@@ -952,17 +956,26 @@ function SearchQualityPanel({
   const [query, setQuery] = useState(unknownQuestions[0] ?? '');
   const [eventVersion, setEventVersion] = useState(0);
   const [evaluation, setEvaluation] = useState<EvaluationMetrics>();
+  const [analyticsEvents, setAnalyticsEvents] = useState<ConversationEvent[]>([]);
+  const analyticsRepository = useMemo(() => getAnalyticsRepository('admin'), []);
   const result = useMemo(() => (query.trim() ? searchKnowledge(query, config) : null), [config, query]);
+  useEffect(() => {
+    let active = true;
+    void analyticsRepository.list(config.bot.id).then((events) => {
+      if (active) setAnalyticsEvents(events);
+    }).catch(() => {
+      if (active) setAnalyticsEvents([]);
+    });
+    return () => { active = false; };
+  }, [analyticsRepository, config.bot.id, eventVersion]);
   const matchedItem = result?.item ?? result?.suggestions[0];
-  const events = useMemo(() => {
-    void eventVersion;
-    return loadConversationEvents().filter((event) => event.botId === config.bot.id);
-  }, [config.bot.id, eventVersion]);
+  const events = analyticsEvents;
   const lowConfidenceCount = events.filter((event) => event.confidence === 'low').length;
   const negativeFeedbackCount = events.filter((event) => event.feedback === 'not-helpful').length;
   const smallTalkCount = events.filter((event) => event.interactionType === 'smalltalk' || event.status === 'smalltalk').length;
   const clarificationCount = events.filter((event) => event.routeMode === 'clarification').length;
   const recentRouteEvents = [...events].filter((event) => event.routeMode).slice(-5).reverse();
+  const experiment = useMemo(() => summarizeExperiment(events, COACH_MYWAY_EXPERIMENT_ID), [events]);
 
   const queueUtteranceReview = () => {
     if (!matchedItem || !query.trim()) return;
@@ -1056,6 +1069,17 @@ function SearchQualityPanel({
               실패: “{failure.query}” → 기대 {failure.expectedId}, 후보 {failure.rankedIds.join(', ') || '없음'}
             </span>
           ))}
+        </div>
+      ) : null}
+
+      {config.bot.id === 'coach-myway' ? (
+        <div className="quality-alternatives">
+          <strong>소크라틱 A/B 실험</strong>
+          {(['candidate', 'socratic'] as const).map((variant) => {
+            const metric = experiment.variants[variant];
+            return <span key={variant}>{variant}: 세션 {metric?.sessions ?? 0} · 해결 {(metric?.resolutionRate ?? 0) * 100}% · 보호 연결 {metric?.protectedHandoffs ?? 0}</span>;
+          })}
+          <span>후보 차이: {((experiment.resolutionDelta ?? 0) * 100).toFixed(1)}%p · {experiment.hasMinimumSample ? (experiment.qualifiesForPromotion ? '승자 기준 충족' : '승자 기준 미충족') : '각 군 500세션 대기'}</span>
         </div>
       ) : null}
 

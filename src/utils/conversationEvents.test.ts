@@ -47,6 +47,7 @@ describe('conversationEvents', () => {
     updateConversationEventSelection(event.id, 'k1', storage);
     expect(loadConversationEvents(storage)[0]).toMatchObject({
       feedback: 'helpful',
+      outcome: 'resolved',
       matchedKnowledgeIds: ['k1'],
       candidateKnowledgeIds: ['k1'],
       topScore: 90,
