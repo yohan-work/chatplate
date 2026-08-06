@@ -18,6 +18,7 @@ import {
   Upload,
   UserCheck,
   Users,
+  X,
 } from 'lucide-react';
 import { searchKnowledge } from '../../engine/searchKnowledge';
 import { answerTrustFor } from '../../engine/answerTrust';
@@ -61,6 +62,7 @@ import { createClientMessageId, type ChatRepository } from '../../services/chatR
 import { getChatRepository } from '../../services/getChatRepository';
 import { LocalChatRepository } from '../../services/localChatRepository';
 import { getAnalyticsRepository } from '../../services/analyticsRepository';
+import { KnowledgeRelationGraph } from './KnowledgeRelationGraph';
 import {
   formatSupportHours,
   getConversationSlaState,
@@ -581,6 +583,7 @@ function KnowledgeEditor({
   onUpdate: (updater: (config: BotConfig) => BotConfig) => void;
 }) {
   const [selectedKnowledgeId, setSelectedKnowledgeId] = useState(config.knowledge[0]?.id ?? '');
+  const [isRelationGraphOpen, setIsRelationGraphOpen] = useState(false);
   const selectedKnowledge = config.knowledge.find((item) => item.id === selectedKnowledgeId) ?? config.knowledge[0];
   const approvalIssues = selectedKnowledge ? knowledgeApprovalIssues(selectedKnowledge) : [];
   const answerTrust = selectedKnowledge ? answerTrustFor(selectedKnowledge) : undefined;
@@ -604,6 +607,15 @@ function KnowledgeEditor({
     onUpdate((current) => removeKnowledgeItem(current, knowledgeId));
     setSelectedKnowledgeId('');
   };
+
+  useEffect(() => {
+    if (!isRelationGraphOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsRelationGraphOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [isRelationGraphOpen]);
 
   return (
     <section className="admin-panel">
@@ -640,6 +652,8 @@ function KnowledgeEditor({
             </label>
             <TextField label="키워드" value={formatCommaList(selectedKnowledge.keywords)} onChange={(value) => updateKnowledge(selectedKnowledge.id, { keywords: parseCommaList(value) })} />
             <TextField label="별칭 질문" value={formatCommaList(selectedKnowledge.aliases)} onChange={(value) => updateKnowledge(selectedKnowledge.id, { aliases: parseCommaList(value) })} />
+            <TextField label="연관 FAQ ID" value={formatCommaList(selectedKnowledge.relatedIds)} onChange={(value) => updateKnowledge(selectedKnowledge.id, { relatedIds: parseCommaList(value) })} />
+            <button className="admin-secondary-button" type="button" onClick={() => setIsRelationGraphOpen(true)}>연관 질문 크게 보기</button>
             {pendingProductionUtterances.length ? (
               <div className="quality-alternatives">
                 <strong>운영 표현 검토 대기</strong>
@@ -762,6 +776,25 @@ function KnowledgeEditor({
           <EmptyState text="등록된 FAQ가 없습니다." />
         )}
       </div>
+      {selectedKnowledge && isRelationGraphOpen ? (
+        <div className="knowledge-graph-modal" role="presentation" onMouseDown={() => setIsRelationGraphOpen(false)}>
+          <section className="knowledge-graph-modal__dialog" role="dialog" aria-modal="true" aria-label="연관 질문 관계도" onMouseDown={(event) => event.stopPropagation()}>
+            <header className="knowledge-graph-modal__header">
+              <div>
+                <strong>연관 질문 관계도</strong>
+                <span>질문을 선택하면 해당 질문을 중심으로 관계와 답변을 확인합니다.</span>
+              </div>
+              <button className="icon-button" type="button" aria-label="관계도 닫기" onClick={() => setIsRelationGraphOpen(false)}><X size={18} aria-hidden="true" /></button>
+            </header>
+            <KnowledgeRelationGraph
+              knowledge={config.knowledge}
+              selectedKnowledgeId={selectedKnowledge.id}
+              onSelect={setSelectedKnowledgeId}
+              large
+            />
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
