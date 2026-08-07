@@ -21,7 +21,7 @@ export function createConversationEvent(
   effectiveQuery = query,
   routeDecision?: ConversationRouteDecision,
   resolution?: Pick<ConversationResolution, 'answerTrust' | 'guardDecision'>,
-  metadata?: Pick<ConversationEvent, 'conversationId' | 'turnIndex' | 'replyPolicy' | 'replyText' | 'dialogueActs' | 'resolvedIntentIds' | 'pendingCandidateIds' | 'contextRevision' | 'engineVersion' | 'experimentId' | 'experimentVariant' | 'experimentAssignmentId' | 'outcome'>,
+  metadata?: Pick<ConversationEvent, 'conversationId' | 'turnIndex' | 'replyPolicy' | 'replyText' | 'dialogueActs' | 'resolvedIntentIds' | 'pendingCandidateIds' | 'contextRevision' | 'engineVersion' | 'experimentId' | 'experimentVariant' | 'experimentAssignmentId' | 'experimentEventType' | 'feedbackForEventId' | 'outcome'>,
 ): ConversationEvent {
   const matchedItems = result.items ?? (result.item ? [result.item] : []);
   const candidateItems = [...matchedItems, ...result.suggestions, ...result.alternatives];
@@ -56,7 +56,7 @@ export function createConversationEvent(
 export function createSmallTalkConversationEvent(
   botId: string,
   resolution: ConversationResolution,
-  metadata?: Pick<ConversationEvent, 'conversationId' | 'turnIndex' | 'replyText' | 'dialogueActs' | 'contextRevision' | 'engineVersion' | 'experimentId' | 'experimentVariant' | 'experimentAssignmentId' | 'outcome'>,
+  metadata?: Pick<ConversationEvent, 'conversationId' | 'turnIndex' | 'replyText' | 'dialogueActs' | 'contextRevision' | 'engineVersion' | 'experimentId' | 'experimentVariant' | 'experimentAssignmentId' | 'experimentEventType' | 'feedbackForEventId' | 'outcome'>,
 ): ConversationEvent {
   return {
     id: `event-${Date.now()}-${Math.random().toString(16).slice(2)}`,

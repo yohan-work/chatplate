@@ -182,6 +182,8 @@ export function conversationEventsToCsv(events: ConversationEvent[]): string {
     'experimentId',
     'experimentVariant',
     'experimentAssignmentId',
+    'experimentEventType',
+    'feedbackForEventId',
     'outcome',
     'createdAt',
   ];
@@ -228,6 +230,8 @@ export function conversationEventsToCsv(events: ConversationEvent[]): string {
     event.experimentId ?? '',
     event.experimentVariant ?? '',
     event.experimentAssignmentId ?? '',
+    event.experimentEventType ?? '',
+    event.feedbackForEventId ?? '',
     event.outcome ?? '',
     event.createdAt,
     ];

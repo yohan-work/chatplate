@@ -423,6 +423,7 @@ export type ConversationEngineVariant = 'baseline' | 'phase3' | 'candidate' | 's
 
 export type ExperimentVariant = 'candidate' | 'socratic';
 export type ExperimentOutcome = 'resolved' | 'unresolved' | 'safety-handoff' | 'pending';
+export type ExperimentEventType = 'exposure' | 'response' | 'feedback';
 
 export interface ConversationExperimentAssignment {
   experimentId: string;
@@ -525,6 +526,8 @@ export interface ConversationEvent {
   experimentId?: string;
   experimentVariant?: ExperimentVariant;
   experimentAssignmentId?: string;
+  experimentEventType?: ExperimentEventType;
+  feedbackForEventId?: string;
   configVersion?: number;
   outcome?: ExperimentOutcome;
   createdAt: string;

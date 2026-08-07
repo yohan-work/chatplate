@@ -430,6 +430,26 @@ export function ChatbotWidget({
       }
 
       const experiment = assignConversationExperiment(botConfig.bot.id, supportConversation.id);
+      if (experiment && !conversationContext?.turnCount) {
+        const exposureEvent: ConversationEvent = {
+          id: `experiment-exposure-${supportConversation.id}`,
+          botId: botConfig.bot.id,
+          conversationId: supportConversation.id,
+          query: '',
+          status: 'answer',
+          confidence: 'high',
+          matchedKnowledgeIds: [],
+          replyPolicy: 'answer',
+          experimentId: experiment.experimentId,
+          experimentVariant: experiment.variant,
+          experimentAssignmentId: experiment.assignmentId,
+          experimentEventType: 'exposure',
+          outcome: 'pending',
+          createdAt: new Date().toISOString(),
+        };
+        if (repository.kind === 'local') appendConversationEvent(exposureEvent);
+        else void analyticsRepository.record(supportConversation.id, exposureEvent).catch(() => undefined);
+      }
       const resolution = resolveConversation(query, botConfig, {
         intentId: selectedIntentId,
         context: conversationContext,
@@ -449,6 +469,7 @@ export function ChatbotWidget({
           experimentId: experiment?.experimentId,
           experimentVariant: experiment?.variant,
           experimentAssignmentId: experiment?.assignmentId,
+          experimentEventType: 'response',
           outcome: outcomeForConversationEvent({ status: 'smalltalk', handoffCta: resolution.handoffCta, guardCategory: resolution.guardDecision?.category }),
         });
         if (repository.kind === 'local') appendConversationEvent(event);
@@ -484,6 +505,7 @@ export function ChatbotWidget({
             experimentId: experiment?.experimentId,
             experimentVariant: experiment?.variant,
             experimentAssignmentId: experiment?.assignmentId,
+            experimentEventType: 'response',
             outcome: outcomeForConversationEvent({
               status: result.status,
               handoffCta: result.confidence === 'low' || result.items?.some((item) => item.handoffRecommended),
@@ -710,6 +732,8 @@ export function ChatbotWidget({
                     experimentId: experiment.experimentId,
                     experimentVariant: experiment.variant,
                     experimentAssignmentId: experiment.assignmentId,
+                    experimentEventType: 'feedback',
+                    feedbackForEventId: messageId,
                     outcome: feedback === 'helpful' ? 'resolved' : 'unresolved',
                     createdAt: new Date().toISOString(),
                   };

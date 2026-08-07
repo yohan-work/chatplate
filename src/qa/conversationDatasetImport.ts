@@ -66,6 +66,8 @@ export function conversationEventsFromCsv(csv: string): ConversationEvent[] {
     experimentId: entry.experimentId || undefined,
     experimentVariant: (entry.experimentVariant || undefined) as ConversationEvent['experimentVariant'],
     experimentAssignmentId: entry.experimentAssignmentId || undefined,
+    experimentEventType: (entry.experimentEventType || undefined) as ConversationEvent['experimentEventType'],
+    feedbackForEventId: entry.feedbackForEventId || undefined,
     outcome: (entry.outcome || undefined) as ConversationEvent['outcome'],
     createdAt: entry.createdAt,
   }));

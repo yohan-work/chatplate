@@ -1110,9 +1110,9 @@ function SearchQualityPanel({
           <strong>소크라틱 A/B 실험</strong>
           {(['candidate', 'socratic'] as const).map((variant) => {
             const metric = experiment.variants[variant];
-            return <span key={variant}>{variant}: 세션 {metric?.sessions ?? 0} · 해결 {(metric?.resolutionRate ?? 0) * 100}% · 보호 연결 {metric?.protectedHandoffs ?? 0}</span>;
+            return <span key={variant}>{variant}: 노출 {metric?.exposedSessions ?? 0} · 응답 {metric?.responseSessions ?? 0} · 해결 {((metric?.resolutionRate ?? 0) * 100).toFixed(1)}% · 보호 연결 {metric?.protectedHandoffs ?? 0}</span>;
           })}
-          <span>후보 차이: {((experiment.resolutionDelta ?? 0) * 100).toFixed(1)}%p · {experiment.hasMinimumSample ? (experiment.qualifiesForPromotion ? '승자 기준 충족' : '승자 기준 미충족') : '각 군 500세션 대기'}</span>
+          <span>후보 차이: {((experiment.resolutionDelta ?? 0) * 100).toFixed(1)}%p · 95% 구간 하한 {((experiment.resolutionDeltaLower95 ?? 0) * 100).toFixed(1)}%p · {experiment.sampleRatioMismatch ? '배정 비율 점검 필요' : experiment.hasMinimumSample ? (experiment.qualifiesForPromotion ? '승자 기준 충족' : '승자 기준 미충족') : '각 군 500세션 대기'}</span>
         </div>
       ) : null}
 
