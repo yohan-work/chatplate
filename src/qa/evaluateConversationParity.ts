@@ -50,6 +50,9 @@ function responseOf(resolution: ConversationResolution, config: BotConfig): Pari
     guardCategory: resolution.guardDecision?.category,
     routeMode: resolution.routeDecision?.mode,
     pendingCandidateIds: resolution.contextPatch?.pendingCandidateIds ?? [],
+    matchedFields: resolution.searchResult?.matchedFields,
+    score: resolution.searchResult?.score,
+    scoreMargin: resolution.searchResult?.scoreMargin,
     excludedKnowledgeIds: resolution.contextPatch?.dialogueFrames
       ?.filter((frame) => frame.status === 'excluded')
       .flatMap((frame) => frame.resolvedKnowledgeIds) ?? [],

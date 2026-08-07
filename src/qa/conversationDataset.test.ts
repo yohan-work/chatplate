@@ -19,13 +19,16 @@ const config = botConfigs['coach-myway'];
 
 describe('Phase 6 conversation dataset', () => {
   it('keeps the declared split counts, valid references, and isolation', () => {
-    expect(coachMywayPhase6Scenarios).toHaveLength(820);
+    expect(coachMywayPhase6Scenarios).toHaveLength(836);
     expect(validateConversationDataset(coachMywayPhase6Scenarios, config)).toEqual([]);
     expect(findConversationDatasetLeakage(coachMywayPhase6Scenarios, config)).toEqual([]);
     expect(summarizeConversationDataset(coachMywayPhase6Scenarios, config)).toMatchObject({
-      scenarios: 820,
-      turns: 1765,
-      bySplit: { development: 400, challenge: 240, sealed: 180 },
+      scenarios: 836,
+      turns: 1781,
+      bySplit: { development: 416, challenge: 240, sealed: 180 },
+      knowledgeIdsCovered: 70,
+      knowledgeCoverageRate: 1,
+      uncoveredKnowledgeIds: [],
     });
   });
 

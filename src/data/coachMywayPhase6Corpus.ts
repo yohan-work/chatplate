@@ -84,9 +84,51 @@ function fromParity(
   };
 }
 
+const ADVICE_COVERAGE_SEEDS: Array<readonly [string, string]> = [
+  ['advice-start', '공부를 시작하는 데 오래 걸리는 학생은 첫 행동을 어떻게 정하면 좋을까요?'],
+  ['advice-procrastination', '해야 할 일을 자꾸 뒤로 미루는 습관을 줄이고 싶어요.'],
+  ['advice-planning', '실제로 지킬 수 있는 학습 계획은 어떤 기준으로 세우나요?'],
+  ['advice-focus', '공부 중 집중이 자주 끊길 때 환경과 시간을 어떻게 조정할까요?'],
+  ['advice-phone', '공부할 때 휴대폰 때문에 흐름이 끊기지 않게 하려면 어떻게 하나요?'],
+  ['advice-environment', '바로 공부를 시작할 수 있도록 책상 주변을 정리하는 방법이 궁금해요.'],
+  ['advice-time', '매일 반복할 수 있는 공부 시간을 정하려면 무엇부터 계산해야 하나요?'],
+  ['advice-weak-subject', '어려운 과목을 처음부터 전부 다시 하지 않고 접근하는 방법이 있을까요?'],
+  ['advice-multiple-subjects', '여러 과목을 함께 공부할 때 우선순위를 정하는 방법을 알려 주세요.'],
+  ['advice-review', '틀린 문제를 다음 학습에 도움이 되게 복습하려면 무엇을 기록해야 하나요?'],
+  ['advice-homework', '과제가 여러 개 밀렸을 때 어떤 과제부터 시작하는 게 좋을까요?'],
+  ['advice-slump', '공부가 계속 무너지는 시기에는 계획을 늘리기 전에 무엇을 점검해야 하나요?'],
+  ['advice-self-directed', '혼자 계획하고 점검하는 공부를 처음 시작하는 방법이 궁금해요.'],
+  ['advice-parent-conflict', '공부 문제로 부모와 학생의 갈등이 반복될 때 확인 기준을 어떻게 정할까요?'],
+  ['advice-goal', '성적 목표를 이번 주에 확인할 수 있는 행동 목표로 바꾸고 싶어요.'],
+  ['advice-progress', '계획한 공부와 실제로 끝낸 공부를 비교해 점검하는 방법이 있나요?'],
+];
+
+const coachMywayAdviceCoverageScenarios: ConversationDatasetScenario[] = ADVICE_COVERAGE_SEEDS.map(([knowledgeId, query], index) => ({
+  id: `phase6-development-advice-coverage-${String(index + 1).padStart(2, '0')}`,
+  schemaVersion: 1,
+  semanticGroupId: `phase6-development-advice-coverage-group-${knowledgeId}`,
+  source: 'authored',
+  authorRole: 'domain-author',
+  createdAt: CREATED_AT,
+  audience: 'unknown',
+  journeyStage: 'coaching',
+  category: 'paraphrase',
+  difficultyTags: ['paraphrase', 'colloquial'],
+  intentIds: [knowledgeId],
+  split: 'development',
+  status: 'reviewed',
+  reviews: REVIEW,
+  turns: [{
+    id: `phase6-development-advice-coverage-${String(index + 1).padStart(2, '0')}-t1`,
+    query,
+    expectation: { acceptedPolicies: ['answer'], acceptedKnowledgeIds: [knowledgeId], requiredKnowledgeIds: [knowledgeId], maxReplyChars: 800 },
+  }],
+}));
+
 export const coachMywayPhase6DevelopmentScenarios: ConversationDatasetScenario[] = coachMywayParityScenarios
   .slice(0, 200)
-  .flatMap((scenario) => [0, 1].map((variant) => fromParity(scenario, 'development', variant)));
+  .flatMap((scenario) => [0, 1].map((variant) => fromParity(scenario, 'development', variant)))
+  .concat(coachMywayAdviceCoverageScenarios);
 
 export const coachMywayPhase6ChallengeScenarios: ConversationDatasetScenario[] = coachMywayParityScenarios
   .slice(200, 320)
@@ -258,7 +300,7 @@ export const coachMywayPhase6Scenarios: ConversationDatasetScenario[] = [
   ...coachMywayPhase6SealedScenarios,
 ];
 
-export const COACH_MYWAY_PHASE6_DEVELOPMENT_COUNT = 400;
+export const COACH_MYWAY_PHASE6_DEVELOPMENT_COUNT = 416;
 export const COACH_MYWAY_PHASE6_CHALLENGE_COUNT = 240;
 export const COACH_MYWAY_PHASE6_SEALED_COUNT = 180;
-export const COACH_MYWAY_PHASE6_TOTAL_COUNT = 820;
+export const COACH_MYWAY_PHASE6_TOTAL_COUNT = 836;

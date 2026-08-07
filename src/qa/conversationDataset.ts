@@ -20,6 +20,8 @@ export interface DatasetCoverage {
   byDifficulty: Record<string, number>;
   knowledgeIdsCovered: number;
   knowledgeCoverageRate: number;
+  uncoveredKnowledgeIds: string[];
+  byKnowledgeId: Record<string, number>;
 }
 
 export interface DatasetLeakageFinding {
@@ -105,6 +107,15 @@ export function summarizeConversationDataset(
       ...(turn.expectation.requiredKnowledgeIds ?? []),
     ]),
   ]).filter((id) => config.knowledge.some((item) => item.id === id)));
+  const byKnowledgeId = turns.reduce<Record<string, number>>((counts, turn) => {
+    const ids = [...new Set([
+      ...(turn.expectation.acceptedKnowledgeIds ?? []),
+      ...(turn.expectation.requiredKnowledgeIds ?? []),
+    ])];
+    ids.forEach((id) => { counts[id] = (counts[id] ?? 0) + 1; });
+    return counts;
+  }, {});
+  const uncoveredKnowledgeIds = config.knowledge.map((item) => item.id).filter((id) => !covered.has(id));
   return {
     scenarios: scenarios.length,
     turns: turns.length,
@@ -115,6 +126,8 @@ export function summarizeConversationDataset(
     byDifficulty: countBy(scenarios.flatMap((scenario) => scenario.difficultyTags)),
     knowledgeIdsCovered: covered.size,
     knowledgeCoverageRate: covered.size / (config.knowledge.length || 1),
+    uncoveredKnowledgeIds,
+    byKnowledgeId,
   };
 }
 

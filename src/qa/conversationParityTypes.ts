@@ -46,6 +46,9 @@ export interface ParityResponse {
   routeMode?: ConversationRouteMode;
   pendingCandidateIds?: string[];
   excludedKnowledgeIds?: string[];
+  matchedFields?: string[];
+  score?: number;
+  scoreMargin?: number;
 }
 
 export interface EvaluationResponder {

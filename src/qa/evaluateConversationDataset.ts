@@ -17,6 +17,9 @@ export interface DatasetQualityFailure {
   responsePolicy: string;
   responseKnowledgeIds: string[];
   responseGuardCategory?: string;
+  matchedFields?: string[];
+  score?: number;
+  scoreMargin?: number;
 }
 
 export interface DatasetQualityReport {
@@ -29,6 +32,8 @@ export interface DatasetQualityReport {
   byCategory: Record<string, { turns: number; passed: number; passRate: number }>;
   parity: ParityMetricSummary;
   failures: DatasetQualityFailure[];
+  byFailureReason: Record<string, number>;
+  byKnowledgeId: Record<string, { attempts: number; passed: number; passRate: number }>;
   thresholds: {
     requiredOverall: number;
     requiredPerCategory: number;
@@ -62,7 +67,7 @@ function extraReasons(
 }
 
 function requiredRate(split: ConversationDatasetSplit | 'all'): number {
-  if (split === 'sealed') return 0.9;
+  if (split === 'sealed') return 0.95;
   if (split === 'challenge') return 0.92;
   return 0.92;
 }
@@ -93,8 +98,19 @@ export async function evaluateConversationDataset(
       responsePolicy: turn.response.policy,
       responseKnowledgeIds: turn.response.knowledgeIds,
       responseGuardCategory: turn.response.guardCategory,
+      matchedFields: turn.response.matchedFields,
+      score: turn.response.score,
+      scoreMargin: turn.response.scoreMargin,
     });
-    return { category: trace.category, passed, hardGateFailed };
+    return {
+      category: trace.category,
+      passed,
+      hardGateFailed,
+      expectedKnowledgeIds: [...new Set([
+        ...(selected[scenarioIndex].turns[turnIndex].expectation.acceptedKnowledgeIds ?? []),
+        ...(selected[scenarioIndex].turns[turnIndex].expectation.requiredKnowledgeIds ?? []),
+      ])],
+    };
   }));
   const categories = [...new Set(results.map((result) => result.category))];
   const byCategory = Object.fromEntries(categories.map((category) => {
@@ -104,8 +120,22 @@ export async function evaluateConversationDataset(
   }));
   const passedTurns = results.filter((result) => result.passed).length;
   const hardGateFailures = results.filter((result) => result.hardGateFailed).length;
-  const thresholds = { requiredOverall: requiredRate(split), requiredPerCategory: 0.85, hardGateFailuresAllowed: 0 };
+  const thresholds = { requiredOverall: requiredRate(split), requiredPerCategory: 0.9, hardGateFailuresAllowed: 0 };
   const passRate = passedTurns / (results.length || 1);
+  const byFailureReason = failures.flatMap((failure) => failure.reasons).reduce<Record<string, number>>((counts, reason) => {
+    counts[reason] = (counts[reason] ?? 0) + 1;
+    return counts;
+  }, {});
+  const byKnowledgeId = results.reduce<Record<string, { attempts: number; passed: number; passRate: number }>>((metrics, entry) => {
+    entry.expectedKnowledgeIds.forEach((id) => {
+      const metric = metrics[id] ?? { attempts: 0, passed: 0, passRate: 0 };
+      metric.attempts += 1;
+      if (entry.passed) metric.passed += 1;
+      metrics[id] = metric;
+    });
+    return metrics;
+  }, {});
+  Object.values(byKnowledgeId).forEach((metric) => { metric.passRate = metric.passed / (metric.attempts || 1); });
   return {
     split,
     scenarioCount: selected.length,
@@ -116,6 +146,8 @@ export async function evaluateConversationDataset(
     byCategory,
     parity: summarizeParityTraces(traces),
     failures,
+    byFailureReason,
+    byKnowledgeId,
     thresholds,
     accepted: passRate >= thresholds.requiredOverall
       && Object.values(byCategory).every((metric) => metric.passRate >= thresholds.requiredPerCategory)
@@ -134,12 +166,18 @@ export function renderConversationDatasetReport(report: DatasetQualityReport): s
   const failures = report.failures.slice(0, 20)
     .map((failure) => `- ${failure.scenarioId}/${failure.turnId}: ${failure.reasons.join(', ')} — ${failure.query}`)
     .join('\n') || '- 없음';
-  return `# Phase 6 dataset evaluation (${report.split})
+  const failureReasons = Object.entries(report.byFailureReason).sort(([, left], [, right]) => right - left)
+    .map(([reason, count]) => `- ${reason}: ${count}`).join('\n') || '- 없음';
+  return `# Phase 7 dataset evaluation (${report.split})
 
 - 판정: ${report.accepted ? 'PASS' : 'FAIL'}
 - 시나리오/턴: ${report.scenarioCount}/${report.turnCount}
 - 해결률: ${percent(report.passRate)} (기준 ${percent(report.thresholds.requiredOverall)})
 - 하드 게이트 실패: ${report.hardGateFailures} (허용 ${report.thresholds.hardGateFailuresAllowed})
+
+## 실패 유형
+
+${failureReasons}
 
 | 범주 | 통과 | 해결률 |
 | --- | ---: | ---: |

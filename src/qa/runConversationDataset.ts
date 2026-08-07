@@ -21,7 +21,7 @@ import { evaluateConversationDataset, renderConversationDatasetReport } from './
 
 const config = botConfigs['coach-myway'];
 const command = process.argv[2] ?? 'validate';
-const VERSION = 'phase6-v1';
+const VERSION = 'phase7-data-quality-v1';
 
 async function writeJson(path: string, value: unknown): Promise<void> {
   const target = resolve(path);

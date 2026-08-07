@@ -169,7 +169,7 @@ npm run qa:conversation:parity
 
 `qa:conversation:phase4`는 제품에 LLM을 연결하지 않은 상태에서 Phase 3 엔진과 현재 결정론적 엔진을 300개·380턴 시나리오로 비교합니다. 100개 의도는 학원 FAQ 50개, 안전한 학습 조언 20개, 관계형 대화 15개, 대화 제어 15개로 구성됩니다. 복합 질문·사용자 정정·모호성·감정이 섞인 질문·안전 경계를 각각 독립 측정하며, 안전한 학습 조언도 승인되지 않은 학원 운영 사실이나 개인 진단을 생성하지 않습니다.
 
-현재 runtime 데이터는 학원 FAQ 50개와 학습 조언 20개, 총 70개 지식 항목·2,800개 검색 발화로 구성됩니다. 브라우저 메모리의 대화 문맥만 사용하고 DB session, LLM API, embedding, RAG는 사용하지 않습니다.
+현재 runtime 데이터는 학원 FAQ 50개와 학습 조언 20개, 총 70개 지식 항목·2,800개 검색 발화로 구성됩니다. Phase 7 품질 데이터셋은 836개 시나리오·1,781턴이며 70개 지식 항목을 모두 커버합니다. 브라우저 메모리의 대화 문맥만 사용하고 DB session, LLM API, embedding, RAG는 사용하지 않습니다.
 
 `qa:conversation:parity`는 검색 index와 정확히 일치하지 않는 신규 corpus의 diagnostic 60%에서 lexical baseline과 현재 candidate를 비교합니다. 최종 40%는 `npm run qa:conversation:parity:holdout`으로 명시적으로 한 번만 확인합니다. 전체 corpus는 360개 대화·780턴이며 이 검사는 제품에 LLM을 연결하지 않습니다.
 
